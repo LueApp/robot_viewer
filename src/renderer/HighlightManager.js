@@ -356,7 +356,7 @@ export class HighlightManager {
             }
         }
 
-        // Line 5: Display link position and orientation
+        // Line 5: Display link position and orientation in model coordinate space
         if (linkPoseEl && link.threeObject) {
             const linkPos = new THREE.Vector3();
             const linkQuat = new THREE.Quaternion();
@@ -364,6 +364,16 @@ export class HighlightManager {
 
             link.threeObject.getWorldPosition(linkPos);
             link.threeObject.getWorldQuaternion(linkQuat);
+
+            // Convert from Three.js world-space back to model-space by
+            // removing the world wrapper's coordinate system rotation
+            const worldWrapperQuat = this.sceneManager.getWorldWrapperQuaternion();
+            if (worldWrapperQuat) {
+                const inverseWorldQuat = worldWrapperQuat.invert();
+                linkPos.applyQuaternion(inverseWorldQuat);
+                linkQuat.premultiply(inverseWorldQuat);
+            }
+
             linkEuler.setFromQuaternion(linkQuat, 'XYZ');
 
             const num_sig_figs = 4; // Decimals to display
@@ -381,12 +391,12 @@ export class HighlightManager {
             const yawDeg = THREE.MathUtils.radToDeg(linkEuler.z).toFixed(num_sig_figs);
 
             const positionBlock =
-                `Position (world):\n` +
+                `Position:\n` +
                 `- x = ${linkPos.x.toFixed(num_sig_figs)} m` +
                 `- y = ${linkPos.y.toFixed(num_sig_figs)} m` +
                 `- z = ${linkPos.z.toFixed(num_sig_figs)} m\n`;
             const orientationBlock =
-            `Orientation (world):\n` +
+            `Orientation:\n` +
             `- Quat: x=${quatX} y=${quatY} z=${quatZ} w=${quatW}\n` +
             `- RPY (rad): r=${rollRad} p=${pitchRad} y=${yawRad}\n` +
             `- RPY (deg): r=${rollDeg} p=${pitchDeg} y=${yawDeg}\n`;

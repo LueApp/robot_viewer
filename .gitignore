@@ -28,3 +28,8 @@ Thumbs.db
 # Cache
 .cache/
 
+.claude/
+openspec/
+
+package-lock.json
+

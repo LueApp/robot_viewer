@@ -57,6 +57,18 @@ export class UIController {
             this.sceneManager.ignoreLimits = !ignoreLimitsBtn.classList.contains('active');
         }
 
+        // Global opacity slider
+        const globalOpacitySlider = document.getElementById('global-opacity-slider');
+        const globalOpacityValue = document.getElementById('global-opacity-value');
+        if (globalOpacitySlider) {
+            globalOpacitySlider.addEventListener('input', () => {
+                const pct = parseInt(globalOpacitySlider.value);
+                if (globalOpacityValue) globalOpacityValue.textContent = pct + '%';
+                this.sceneManager.visualizationManager.setGlobalOpacity(pct / 100);
+                this.sceneManager.redraw();
+            });
+        }
+
         // Display options event listeners
         if (showVisualBtn) {
             showVisualBtn.addEventListener('click', () => {

@@ -91,6 +91,9 @@ export const translations = {
         'controllable': '可控',
         'rootLink': '根Link',
 
+        // 透明度
+        'opacity': '透明度',
+
         // 悬浮信息
         'linkName': 'Link名称',
         'jointName': '关节',
@@ -152,6 +155,9 @@ export const translations = {
         'jointControl': 'Joints',
         'modelStructure': 'Structure',
         'codeEditor': 'Editor',
+
+        // Opacity
+        'opacity': 'Opacity',
 
         // Joint control
         'radian': 'Radian',

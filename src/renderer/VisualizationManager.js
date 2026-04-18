@@ -10,6 +10,8 @@ export class VisualizationManager {
         this.collisionMeshes = [];
         this.colliders = [];
         this.hiddenLinks = new Set();
+        this.linkOpacities = new Map(); // linkName -> opacity (0-1)
+        this.globalOpacity = 1.0;
 
         // Display states
         this.showVisual = true;
@@ -811,6 +813,121 @@ export class VisualizationManager {
     }
 
     /**
+     * Set global opacity for all visual meshes
+     * @param {number} opacity - Opacity value 0-1
+     */
+    setGlobalOpacity(opacity) {
+        this.globalOpacity = opacity;
+        this.visualMeshes.forEach(mesh => {
+            if (!mesh.material) return;
+            const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            materials.forEach(material => {
+                if (!material) return;
+                if (material.userData.originalOpacity === undefined) {
+                    material.userData.originalOpacity = material.opacity !== undefined ? material.opacity : 1.0;
+                    material.userData.originalTransparent = material.transparent || false;
+                }
+                if (opacity < 1.0) {
+                    material.transparent = true;
+                    material.opacity = opacity;
+                    material.depthWrite = opacity > 0.5;
+                } else {
+                    material.opacity = material.userData.originalOpacity;
+                    material.transparent = material.userData.originalTransparent;
+                    material.depthWrite = true;
+                }
+                material.needsUpdate = true;
+            });
+        });
+    }
+
+    /**
+     * Set opacity for a specific link
+     * @param {string} linkName - The link name
+     * @param {number} opacity - Opacity value 0-1
+     * @param {Object} currentModel - The current robot model
+     */
+    setLinkOpacity(linkName, opacity, currentModel) {
+        if (!currentModel || !currentModel.links) return;
+
+        const link = currentModel.links.get(linkName);
+        if (!link || !link.threeObject) return;
+
+        if (opacity >= 1.0) {
+            this.linkOpacities.delete(linkName);
+        } else {
+            this.linkOpacities.set(linkName, opacity);
+        }
+
+        this._applyLinkOpacity(link.threeObject, opacity, currentModel);
+    }
+
+    /**
+     * Get opacity for a specific link (defaults to 1.0)
+     */
+    getLinkOpacity(linkName) {
+        return this.linkOpacities.has(linkName) ? this.linkOpacities.get(linkName) : 1.0;
+    }
+
+    /**
+     * Apply opacity to link meshes (traverses fixed child links)
+     */
+    _applyLinkOpacity(linkObject, opacity, currentModel) {
+        const traverse = (obj, isRoot = false) => {
+            if (!isRoot && (obj.type === 'URDFLink' || obj.isURDFLink)) return;
+
+            if (obj.isURDFJoint || obj.type === 'URDFJoint') {
+                const jointName = obj.name;
+                let isFixed = false;
+                if (jointName && currentModel?.joints && currentModel.joints.has(jointName)) {
+                    isFixed = currentModel.joints.get(jointName).type === 'fixed';
+                }
+                if (isFixed) {
+                    for (const child of obj.children) traverse(child, false);
+                }
+                return;
+            }
+
+            if (this.isAuxiliaryVisualization(obj) || obj.userData?.isCenterOfMass || obj.userData?.isInertiaBox) return;
+            if (obj.name && obj.name.endsWith('_axes')) return;
+
+            if (obj.type === 'Mesh' || obj.isMesh) {
+                let isCollision = false;
+                let checkNode = obj;
+                while (checkNode) {
+                    if (checkNode.isURDFCollider) { isCollision = true; break; }
+                    checkNode = checkNode.parent;
+                }
+                if (isCollision || obj.userData?.isCollision) return;
+
+                const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+                materials.forEach(material => {
+                    if (!material) return;
+                    // Save original opacity if not already saved
+                    if (material.userData.originalOpacity === undefined) {
+                        material.userData.originalOpacity = material.opacity !== undefined ? material.opacity : 1.0;
+                        material.userData.originalTransparent = material.transparent || false;
+                    }
+                    if (opacity < 1.0) {
+                        material.transparent = true;
+                        material.opacity = opacity;
+                        material.depthWrite = opacity > 0.5;
+                    } else {
+                        material.opacity = material.userData.originalOpacity;
+                        material.transparent = material.userData.originalTransparent;
+                        material.depthWrite = true;
+                    }
+                    material.needsUpdate = true;
+                });
+            }
+
+            for (const child of obj.children) traverse(child, false);
+        };
+
+        traverse(linkObject, true);
+    }
+
+    /**
      * Check if object is auxiliary visualization object (should not be highlighted)
      */
     isAuxiliaryVisualization(obj) {
@@ -888,6 +1005,8 @@ export class VisualizationManager {
         this.collisionMeshes = [];
         this.colliders = [];
         this.hiddenLinks.clear();
+        this.linkOpacities.clear();
+        this.globalOpacity = 1.0;
     }
 }
 

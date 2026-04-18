@@ -641,6 +641,16 @@ export class ModelGraphView {
             }
         });
 
+        // Update opacity slider to reflect current link opacity
+        const opacitySlider = menu.querySelector('#context-opacity-slider');
+        const opacityValue = menu.querySelector('#context-opacity-value');
+        if (opacitySlider && opacityValue) {
+            const currentOpacity = this.sceneManager.visualizationManager.getLinkOpacity(linkName);
+            const pct = Math.round(currentOpacity * 100);
+            opacitySlider.value = pct;
+            opacityValue.textContent = pct + '%';
+        }
+
         // Position menu at mouse cursor
         menu.style.left = event.clientX + 'px';
         menu.style.top = event.clientY + 'px';
@@ -682,6 +692,25 @@ export class ModelGraphView {
     setupContextMenuActions() {
         const menu = document.getElementById('graph-context-menu');
         if (!menu) return;
+
+        // Opacity slider handler
+        const opacitySlider = menu.querySelector('#context-opacity-slider');
+        const opacityValue = menu.querySelector('#context-opacity-value');
+        if (opacitySlider) {
+            opacitySlider.addEventListener('input', (event) => {
+                event.stopPropagation();
+                const pct = parseInt(event.target.value);
+                if (opacityValue) opacityValue.textContent = pct + '%';
+                const linkName = this._contextLinkName;
+                const model = this._contextModel;
+                if (!linkName || !this.sceneManager) return;
+                this.sceneManager.visualizationManager.setLinkOpacity(linkName, pct / 100, model);
+                this.sceneManager.redraw();
+            });
+            // Prevent menu dismissal when interacting with slider
+            opacitySlider.addEventListener('click', (e) => e.stopPropagation());
+            opacitySlider.addEventListener('mousedown', (e) => e.stopPropagation());
+        }
 
         menu.addEventListener('click', (event) => {
             const item = event.target.closest('.context-menu-item');

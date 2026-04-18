@@ -516,6 +516,27 @@ export class UIController {
         });
     }
 
+    setupCopiedFramesPanelToggle() {
+        const btn = document.getElementById('toggle-copied-frames-panel');
+        if (!btn) return;
+
+        btn.addEventListener('click', () => {
+            const panel = document.getElementById('floating-copied-frames-panel');
+            if (!panel) {
+                // Panel not yet created — nothing to toggle
+                return;
+            }
+            const isVisible = panel.style.display !== 'none';
+            if (isVisible) {
+                panel.style.display = 'none';
+                btn.classList.remove('active');
+            } else {
+                panel.style.display = '';
+                btn.classList.add('active');
+            }
+        });
+    }
+
     /**
      * Setup all buttons and panels
      */
@@ -535,6 +556,7 @@ export class UIController {
         this.setupJointAxesToggle();
         this.setupShadowToggle();
         this.setupLightingToggle();
+        this.setupCopiedFramesPanelToggle();
     }
 
     /**

@@ -1289,6 +1289,228 @@
             background: var(--glass-border);
         }
 
+        /* Copied frames panel */
+        #floating-copied-frames-panel {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 300px;
+            max-height: 400px;
+            z-index: 200;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px) saturate(150%);
+            -webkit-backdrop-filter: blur(20px) saturate(150%);
+            border: 0.5px solid var(--glass-border);
+            border-radius: 12px;
+            box-shadow: var(--glass-shadow);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+        }
+
+        #floating-copied-frames-panel .floating-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 0.5px solid var(--glass-border);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            cursor: move;
+        }
+
+        #floating-copied-frames-panel .panel-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .copied-frame-mode-btn {
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .copied-frame-mode-btn.active {
+            background: var(--accent-color, #007AFF);
+            border-color: var(--accent-color, #007AFF);
+            color: #fff;
+        }
+
+        .copied-frame-mode-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        [data-theme="light"] .copied-frame-mode-btn:hover:not(.active) {
+            background: rgba(0, 0, 0, 0.06);
+        }
+
+        #copied-frames-list {
+            padding: 6px;
+            overflow-y: auto;
+            max-height: 340px;
+        }
+
+        .copied-frame-entry {
+            padding: 8px;
+            margin-bottom: 4px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .copied-frame-entry:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        [data-theme="light"] .copied-frame-entry:hover {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .copied-frame-entry.selected {
+            border-color: rgba(0, 150, 255, 0.4);
+            background: rgba(0, 150, 255, 0.06);
+        }
+
+        .copied-frame-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .copied-frame-label {
+            font-size: 11px;
+            color: var(--text-primary);
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .copied-frame-delete {
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 11px;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+
+        .copied-frame-delete:hover {
+            background: rgba(255, 59, 48, 0.15);
+            color: #ff3b30;
+        }
+
+        .copied-frame-hide-source {
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            flex-shrink: 0;
+            transition: all 0.15s;
+            opacity: 0.5;
+        }
+
+        .copied-frame-hide-source:hover {
+            opacity: 1;
+        }
+
+        .copied-frame-hide-source.active {
+            opacity: 0.3;
+        }
+
+        .copied-frame-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .copied-frame-input-group {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .copied-frame-input-group-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            width: 12px;
+            flex-shrink: 0;
+            text-align: center;
+            opacity: 0.7;
+        }
+
+        .copied-frame-input-pair {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            flex: 1;
+        }
+
+        .copied-frame-input-pair label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            width: 10px;
+            flex-shrink: 0;
+            text-align: center;
+        }
+
+        .copied-frame-input-pair label.axis-x { color: #ff6666; }
+        .copied-frame-input-pair label.axis-y { color: #66cc66; }
+        .copied-frame-input-pair label.axis-z { color: #6688ff; }
+        .copied-frame-input-pair label.axis-r { color: #ff6666; }
+        .copied-frame-input-pair label.axis-p { color: #66cc66; }
+        .copied-frame-input-pair label.axis-w { color: #6688ff; }
+
+        .copied-frame-input-pair input[type="number"] {
+            width: 100%;
+            padding: 2px 4px;
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            outline: none;
+            -moz-appearance: textfield;
+        }
+
+        .copied-frame-input-pair input[type="number"]::-webkit-inner-spin-button,
+        .copied-frame-input-pair input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .copied-frame-input-pair input[type="number"]:focus {
+            border-color: var(--accent-color, #007AFF);
+        }
+
+        [data-theme="light"] .copied-frame-input-pair input[type="number"] {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
         /* File tree styles */
         .file-tree {
             font-size: 13px;
@@ -3131,6 +3353,9 @@
                     <button class="tool-button" id="open-editor-btn">
                         <span class="tool-button-text" data-i18n="edit"></span>
                     </button>
+                    <button class="tool-button" id="toggle-copied-frames-panel">
+                        <span class="tool-button-text" data-i18n="copiedFrames"></span>
+                    </button>
                 </div>
 
                 <div class="control-bar-divider"></div>
@@ -3255,6 +3480,15 @@
                 <div class="context-menu-item" data-action="toggle-inertia">
                     <span class="context-menu-check"></span>
                     <span data-i18n="inertia">Inertia</span>
+                </div>
+                <div class="context-menu-divider"></div>
+                <div class="context-menu-item" data-action="copy-frame">
+                    <span class="context-menu-check" style="visibility:hidden"></span>
+                    <span data-i18n="copyFrame">Copy Frame</span>
+                </div>
+                <div class="context-menu-item" data-action="copy-joint-axis">
+                    <span class="context-menu-check" style="visibility:hidden"></span>
+                    <span data-i18n="copyJointAxis">Copy Joint Axis</span>
                 </div>
             </div>
 

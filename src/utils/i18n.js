@@ -94,6 +94,16 @@ export const translations = {
         // 透明度
         'opacity': '透明度',
 
+        // 复制坐标系
+        'copyFrame': '复制坐标系',
+        'copyJointAxis': '复制关节轴',
+        'copiedFrames': '复制的坐标系',
+        'translation': '平移',
+        'rotation': '旋转',
+        'deleteFrame': '删除',
+        'translate': '平移',
+        'rotate': '旋转',
+
         // 悬浮信息
         'linkName': 'Link名称',
         'jointName': '关节',
@@ -158,6 +168,16 @@ export const translations = {
 
         // Opacity
         'opacity': 'Opacity',
+
+        // Copy frame
+        'copyFrame': 'Copy Frame',
+        'copyJointAxis': 'Copy Joint Axis',
+        'copiedFrames': 'Copied Frames',
+        'translation': 'Translation',
+        'rotation': 'Rotation',
+        'deleteFrame': 'Delete',
+        'translate': 'Translate',
+        'rotate': 'Rotate',
 
         // Joint control
         'radian': 'Radian',

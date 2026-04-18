@@ -632,12 +632,24 @@ export class ModelGraphView {
                     isActive = this.sceneManager.inertialVisualization.isLinkInertiaVisible(linkName);
                     item.classList.remove('disabled');
                     break;
+                case 'copy-frame':
+                    item.classList.remove('disabled');
+                    break;
+                case 'copy-joint-axis':
+                    if (this.sceneManager.axesManager.hasJointAxis(linkName, model)) {
+                        item.classList.remove('disabled');
+                    } else {
+                        item.classList.add('disabled');
+                    }
+                    break;
             }
 
-            if (isActive) {
-                check.classList.add('checked');
-            } else {
-                check.classList.remove('checked');
+            if (check) {
+                if (isActive) {
+                    check.classList.add('checked');
+                } else {
+                    check.classList.remove('checked');
+                }
             }
         });
 
@@ -748,6 +760,14 @@ export class ModelGraphView {
                 case 'toggle-inertia': {
                     const current = this.sceneManager.inertialVisualization.isLinkInertiaVisible(linkName);
                     this.sceneManager.inertialVisualization.toggleLinkInertia(linkName, !current, this.sceneManager.currentModel);
+                    break;
+                }
+                case 'copy-frame': {
+                    this.sceneManager.copiedFrameManager.copyLinkFrame(linkName, model);
+                    break;
+                }
+                case 'copy-joint-axis': {
+                    this.sceneManager.copiedFrameManager.copyJointAxis(linkName, model);
                     break;
                 }
             }

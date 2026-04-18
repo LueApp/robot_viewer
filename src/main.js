@@ -167,6 +167,9 @@ class App {
                 this.panelManager.setModelGraphView(this.modelGraphView);
             }
 
+            // Pass PanelManager reference to SceneManager for dynamic panel registration
+            this.sceneManager.panelManager = this.panelManager;
+
             // Initialize UI controller
             this.uiController = new UIController(this.sceneManager);
             this.uiController.setupAll({
@@ -614,10 +617,32 @@ class App {
                 raycaster.setFromCamera(mouse, this.sceneManager.camera);
                 const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
 
+                // Check if a copied frame was clicked
+                let clickedCopiedFrame = false;
+                for (const hit of intersects) {
+                    let current = hit.object;
+                    while (current) {
+                        if (current.userData && current.userData.isCopiedFrame && current.userData.copiedFrameId) {
+                            this.sceneManager.copiedFrameManager.selectFrame(current.userData.copiedFrameId);
+                            clickedCopiedFrame = true;
+                            break;
+                        }
+                        current = current.parent;
+                    }
+                    if (clickedCopiedFrame) break;
+                }
+                if (clickedCopiedFrame) {
+                    mouseDownPos = null;
+                    return;
+                }
+
                 const modelIntersects = intersects.filter(intersect => {
                     const obj = intersect.object;
+                    // Skip copied frame objects
+                    if (obj.userData && obj.userData.isCopiedFrame) return false;
                     let current = obj;
                     while (current) {
+                        if (current.userData && current.userData.isCopiedFrame) return false;
                         const name = current.name || '';
                         if (name.includes('jointAxis') || name.includes('helper') ||
                             name.includes('grid') || name.includes('Ground') ||

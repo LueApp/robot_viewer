@@ -9,6 +9,7 @@ import { ConstraintManager } from './ConstraintManager.js';
 import { CoordinateAxesManager } from './CoordinateAxesManager.js';
 import { HighlightManager } from './HighlightManager.js';
 import { MeasurementManager } from './MeasurementManager.js';
+import { CopiedFrameManager } from './CopiedFrameManager.js';
 
 /**
  * SceneManager - Core scene management and coordination
@@ -94,6 +95,7 @@ export class SceneManager {
         this.axesManager = new CoordinateAxesManager(this);
         this.highlightManager = new HighlightManager(this);
         this.measurementManager = new MeasurementManager(this);
+        this.copiedFrameManager = new CopiedFrameManager(this);
 
         // Current model
         this.currentModel = null;
@@ -304,6 +306,7 @@ export class SceneManager {
         this.inertialVisualization.clear();
         this.constraintManager.clear();
         this.measurementManager.clear();
+        this.copiedFrameManager.clearAll();
         this.highlightManager.clearHighlight();
 
         // Clear drag controls

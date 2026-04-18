@@ -186,6 +186,44 @@ export class UIController {
             });
         }
 
+        // Vector input toggle button
+        const vectorInputBtn = document.getElementById('vector-input-btn');
+        const vectorInputArea = document.getElementById('vector-input-area');
+        const vectorInputField = document.getElementById('vector-input-field');
+        const vectorApplyBtn = document.getElementById('vector-apply-btn');
+
+        if (vectorInputBtn && vectorInputArea) {
+            vectorInputBtn.addEventListener('click', () => {
+                const isVisible = vectorInputArea.style.display !== 'none';
+                vectorInputArea.style.display = isVisible ? 'none' : '';
+                vectorInputBtn.classList.toggle('active', !isVisible);
+                if (!isVisible && vectorInputField) {
+                    vectorInputField.focus();
+                }
+            });
+        }
+
+        const applyVector = () => {
+            if (vectorInputField && vectorInputField.value.trim()) {
+                const result = this.onVectorInput?.(vectorInputField.value);
+                if (result?.success) {
+                    vectorInputField.value = '';
+                }
+            }
+        };
+
+        if (vectorApplyBtn) {
+            vectorApplyBtn.addEventListener('click', applyVector);
+        }
+
+        if (vectorInputField) {
+            vectorInputField.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    applyVector();
+                }
+            });
+        }
+
         // MuJoCo simulation control buttons
         const mujocoResetBtn = document.getElementById('mujoco-reset-btn-bar');
         if (mujocoResetBtn) {
@@ -545,6 +583,7 @@ export class UIController {
         this.onAngleUnitChanged = callbacks.onAngleUnitChanged;
         this.onIgnoreLimitsChanged = callbacks.onIgnoreLimitsChanged;
         this.onResetJoints = callbacks.onResetJoints;
+        this.onVectorInput = callbacks.onVectorInput;
         this.onMujocoReset = callbacks.onMujocoReset;
         this.onMujocoToggleSimulate = callbacks.onMujocoToggleSimulate;
 

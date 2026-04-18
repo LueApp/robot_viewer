@@ -35,6 +35,11 @@ export const translations = {
         'degree': '角度',
         'reset': '重置',
         'limits': '限位',
+        'vectorInput': '向量',
+        'vectorInputPlaceholder': '输入关节值，如: 0.1, 0.2, 0.3 ...',
+        'vectorApply': '应用',
+        'vectorMismatch': '值数量 ({count}) 与可控关节数量 ({expected}) 不匹配',
+        'vectorApplied': '已应用关节向量',
 
         // MuJoCo 仿真
         'mujocoReset': '重置',
@@ -184,6 +189,11 @@ export const translations = {
         'degree': 'Degree',
         'reset': 'Reset',
         'limits': 'Limits',
+        'vectorInput': 'Vector',
+        'vectorInputPlaceholder': 'Enter joint values, e.g.: 0.1, 0.2, 0.3 ...',
+        'vectorApply': 'Apply',
+        'vectorMismatch': 'Value count ({count}) does not match controllable joints ({expected})',
+        'vectorApplied': 'Joint vector applied',
 
         // MuJoCo simulation
         'mujocoReset': 'Reset',

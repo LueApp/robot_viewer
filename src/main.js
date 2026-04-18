@@ -178,6 +178,7 @@ class App {
                 onIgnoreLimitsChanged: (ignore) => this.handleIgnoreLimitsChanged(ignore),
                 onLanguageChanged: (lang) => this.handleLanguageChanged(lang),
                 onResetJoints: () => this.handleResetJoints(),
+                onVectorInput: (text) => this.handleVectorInput(text),
                 onMujocoReset: () => this.handleMujocoReset(),
                 onMujocoToggleSimulate: () => this.handleMujocoToggleSimulate()
             });
@@ -936,6 +937,16 @@ class App {
         if (this.currentModel && this.jointControlsUI) {
             this.jointControlsUI.resetAllJoints(this.currentModel);
         }
+    }
+
+    /**
+     * Handle vector input for setting all joints
+     */
+    handleVectorInput(text) {
+        if (this.currentModel && this.jointControlsUI) {
+            return this.jointControlsUI.setAllJoints(this.currentModel, text);
+        }
+        return { success: false };
     }
 
     /**

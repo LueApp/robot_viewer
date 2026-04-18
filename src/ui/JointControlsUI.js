@@ -598,6 +598,80 @@ export class JointControlsUI {
     }
 
     /**
+     * Set all joints from a vector of values (in display unit)
+     * @param {UnifiedRobotModel} model
+     * @param {string} vectorText - plain text like "0.1, 0.2, 0.3" or "[0.1 0.2 0.3]"
+     * @returns {{ success: boolean, message?: string }}
+     */
+    setAllJoints(model, vectorText) {
+        if (!model || !model.joints) {
+            return { success: false };
+        }
+
+        // Get ordered list of controllable joints
+        const controllableJoints = [];
+        model.joints.forEach((joint, name) => {
+            if (joint.type !== 'fixed') {
+                controllableJoints.push({ name, joint });
+            }
+        });
+
+        if (controllableJoints.length === 0) {
+            return { success: false };
+        }
+
+        // Parse the vector text: strip brackets, split by comma/space/semicolon
+        const cleaned = vectorText.replace(/[\[\](){}]/g, '').trim();
+        const tokens = cleaned.split(/[\s,;]+/).filter(t => t.length > 0);
+        const values = tokens.map(t => parseFloat(t));
+
+        if (values.some(v => isNaN(v))) {
+            return { success: false };
+        }
+
+        if (values.length !== controllableJoints.length) {
+            const msg = window.i18n.t('vectorMismatch')
+                .replace('{count}', values.length)
+                .replace('{expected}', controllableJoints.length);
+            return { success: false, message: msg };
+        }
+
+        // Apply values
+        controllableJoints.forEach(({ name, joint }, i) => {
+            let valueInRad = this.angleUnit === 'deg'
+                ? values[i] * Math.PI / 180
+                : values[i];
+
+            ModelLoaderFactory.setJointAngle(model, name, valueInRad);
+            joint.currentValue = valueInRad;
+
+            // Update slider and display
+            const slider = document.querySelector(`input[data-joint="${name}"]`);
+            if (slider) {
+                slider.value = valueInRad;
+                const control = slider.closest('.joint-control');
+                if (control && control._updateDisplay) {
+                    control._updateDisplay();
+                }
+            }
+
+            // Apply constraints
+            if (this.sceneManager.constraintManager) {
+                this.sceneManager.constraintManager.applyConstraints(model, joint);
+            }
+        });
+
+        this.sceneManager.redraw();
+        this.sceneManager.render();
+
+        if (this.sceneManager.onMeasurementUpdate) {
+            this.sceneManager.onMeasurementUpdate();
+        }
+
+        return { success: true };
+    }
+
+    /**
      * Update limits for all sliders
      */
     updateAllSliderLimits(model, ignoreLimits) {

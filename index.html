@@ -2118,6 +2118,118 @@
             background: rgba(0, 0, 0, 0.05);
         }
 
+        /* Vector input button */
+        #floating-joints-panel #vector-input-btn {
+            padding: 5px 12px;
+            height: auto;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s var(--spring);
+            flex-shrink: 0;
+            pointer-events: auto;
+            min-width: 42px;
+        }
+
+        #floating-joints-panel #vector-input-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+
+        #floating-joints-panel #vector-input-btn:active {
+            transform: scale(0.98);
+        }
+
+        #floating-joints-panel #vector-input-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+            box-shadow: 0 1px 4px rgba(10, 132, 255, 0.3);
+        }
+
+        #floating-joints-panel #vector-input-btn.active:hover {
+            box-shadow: 0 4px 16px rgba(10, 132, 255, 0.4);
+            transform: scale(1.05);
+        }
+
+        [data-theme="light"] #floating-joints-panel #vector-input-btn {
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] #floating-joints-panel #vector-input-btn:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        /* Vector input area */
+        #vector-input-area {
+            padding: 8px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        [data-theme="light"] #vector-input-area {
+            border-bottom-color: rgba(0, 0, 0, 0.06);
+        }
+
+        .vector-input-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        #vector-input-field {
+            flex: 1;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 12px;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #vector-input-field:focus {
+            border-color: var(--accent);
+        }
+
+        #vector-input-field::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+
+        [data-theme="light"] #vector-input-field {
+            background: rgba(0, 0, 0, 0.04);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+
+        #vector-apply-btn {
+            padding: 6px 14px;
+            background: var(--accent);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        #vector-apply-btn:hover {
+            filter: brightness(1.1);
+            box-shadow: 0 2px 8px rgba(10, 132, 255, 0.3);
+        }
+
+        #vector-apply-btn:active {
+            transform: scale(0.96);
+        }
+
         .model-graph-content {
             flex: 1;
             overflow: hidden;
@@ -3409,8 +3521,17 @@
                         <button class="control-button active" id="ignore-limits" data-checked="true">
                             <span data-i18n="limits"></span>
                         </button>
+                        <button class="control-button" id="vector-input-btn">
+                            <span data-i18n="vectorInput"></span>
+                        </button>
                         <button class="panel-maximize-btn" data-panel-id="floating-joints-panel">⛶</button>
                         <button class="panel-close-btn" data-panel="floating-joints-panel">✕</button>
+                    </div>
+                </div>
+                <div id="vector-input-area" style="display: none;">
+                    <div class="vector-input-row">
+                        <input type="text" id="vector-input-field" data-i18n="vectorInputPlaceholder" autocomplete="off" spellcheck="false">
+                        <button id="vector-apply-btn" data-i18n="vectorApply"></button>
                     </div>
                 </div>
                 <div class="floating-panel-content" id="joint-controls">

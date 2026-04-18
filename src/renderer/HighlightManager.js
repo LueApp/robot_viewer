@@ -390,6 +390,16 @@ export class HighlightManager {
             const pitchDeg = THREE.MathUtils.radToDeg(linkEuler.y).toFixed(num_sig_figs);
             const yawDeg = THREE.MathUtils.radToDeg(linkEuler.z).toFixed(num_sig_figs);
 
+            // Compute 3x3 rotation matrix from quaternion
+            const rotMat = new THREE.Matrix4().makeRotationFromQuaternion(linkQuat);
+            const e = rotMat.elements; // column-major order
+            const f = num_sig_figs;
+            const rotMatBlock =
+                `- RotMat:\n` +
+                `  [${e[0].toFixed(f)}, ${e[4].toFixed(f)}, ${e[8].toFixed(f)}]\n` +
+                `  [${e[1].toFixed(f)}, ${e[5].toFixed(f)}, ${e[9].toFixed(f)}]\n` +
+                `  [${e[2].toFixed(f)}, ${e[6].toFixed(f)}, ${e[10].toFixed(f)}]\n`;
+
             const positionBlock =
                 `Position:\n` +
                 `- x = ${linkPos.x.toFixed(num_sig_figs)} m` +
@@ -399,7 +409,8 @@ export class HighlightManager {
             `Orientation:\n` +
             `- Quat: x=${quatX} y=${quatY} z=${quatZ} w=${quatW}\n` +
             `- RPY (rad): r=${rollRad} p=${pitchRad} y=${yawRad}\n` +
-            `- RPY (deg): r=${rollDeg} p=${pitchDeg} y=${yawDeg}\n`;
+            `- RPY (deg): r=${rollDeg} p=${pitchDeg} y=${yawDeg}\n` +
+            rotMatBlock;
 
             linkPoseEl.textContent = positionBlock + orientationBlock;
             linkPoseEl.style.display = 'block';

@@ -585,5 +585,5 @@ export class PointerJointDragControls extends JointDragControls {
 }
 
 // For backward compatibility, export old names
-export { JointDragControls as URDFDragControls, PointerJointDragControls as PointerURDFDragControls };
+export { JointDragControls as URDFDragControls, PointerJointDragControls as PointerURDFDragControls, findParentLink };
 

@@ -7,10 +7,12 @@ import { MathUtils } from '../utils/MathUtils.js';
 export class InertialVisualization {
     constructor(sceneManager) {
         this.sceneManager = sceneManager;
-        this.comMarkers = [];
-        this.inertiaEllipsoids = [];
+        this.comMarkers = new Map();
+        this.inertiaEllipsoids = new Map();
         this.showCOM = false;
         this.showInertia = false;
+        this.perLinkCOM = new Set();
+        this.perLinkInertia = new Set();
     }
 
     /**
@@ -78,8 +80,8 @@ export class InertialVisualization {
                 ellipsoid.parent.remove(ellipsoid);
             }
         });
-        this.comMarkers = [];
-        this.inertiaEllipsoids = [];
+        this.comMarkers = new Map();
+        this.inertiaEllipsoids = new Map();
 
         if (!model.links) {
             return;
@@ -110,12 +112,12 @@ export class InertialVisualization {
                 comPosition = new THREE.Vector3(0, 0, 0);
             }
 
-            // Create COM marker (only when display is needed)
-            if (this.showCOM && inertial.mass !== undefined && inertial.mass > 0) {
+            // Create COM marker if link has mass (always created for per-link toggling)
+            if (inertial.mass !== undefined && inertial.mass > 0) {
                 this.createCOMMarker(model, link, comPosition);
             }
 
-            // Create inertia ellipsoid (only when display is needed)
+            // Create inertia box only when global toggle is on
             if (this.showInertia && (inertial.ixx !== undefined || inertial.inertia)) {
                 this.createInertiaEllipsoid(model, link, comPosition, inertial);
             }
@@ -228,10 +230,10 @@ export class InertialVisualization {
         comGroup.userData.isCenterOfMass = true;
 
         comGroup.position.copy(position);
-        comGroup.visible = this.showCOM;
+        comGroup.visible = this.showCOM || this.perLinkCOM.has(link.name);
 
         linkObject.add(comGroup);
-        this.comMarkers.push(comGroup);
+        this.comMarkers.set(link.name, comGroup);
     }
 
     /**
@@ -322,7 +324,7 @@ export class InertialVisualization {
             inertiaBox.rotation.set(0, 0, 0);
         }
 
-        inertiaBox.visible = this.showInertia;
+        inertiaBox.visible = this.showInertia || this.perLinkInertia.has(link.name);
         inertiaBox.castShadow = false;
         inertiaBox.receiveShadow = false;
 
@@ -337,7 +339,27 @@ export class InertialVisualization {
             this.sceneManager.scene.add(inertiaBox);
         }
 
-        this.inertiaEllipsoids.push(inertiaBox); // Although called ellipsoids, they're boxes now
+        this.inertiaEllipsoids.set(link.name, inertiaBox);
+    }
+
+    /**
+     * Get COM position from inertial data
+     */
+    _getComPosition(inertial) {
+        try {
+            if (inertial.origin && inertial.origin.xyz) {
+                return MathUtils.xyzToVector3(inertial.origin.xyz);
+            } else if (inertial.origin) {
+                return new THREE.Vector3(
+                    inertial.origin[0] || 0,
+                    inertial.origin[1] || 0,
+                    inertial.origin[2] || 0
+                );
+            }
+        } catch (error) {
+            // Fall through to default
+        }
+        return new THREE.Vector3(0, 0, 0);
     }
 
     /**
@@ -359,13 +381,11 @@ export class InertialVisualization {
     toggleCenterOfMass(show, currentModel) {
         this.showCOM = show;
 
-        if (show && this.comMarkers.length === 0 && currentModel) {
-            // If enabling and not yet created, need to recreate
+        if (this.comMarkers.size === 0 && currentModel) {
             this.extractInertialProperties(currentModel);
         } else {
-            // Otherwise just toggle visibility
-            this.comMarkers.forEach(marker => {
-                marker.visible = show;
+            this.comMarkers.forEach((marker, linkName) => {
+                marker.visible = show || this.perLinkCOM.has(linkName);
             });
         }
     }
@@ -376,15 +396,64 @@ export class InertialVisualization {
     toggleInertia(show, currentModel) {
         this.showInertia = show;
 
-        if (show && this.inertiaEllipsoids.length === 0 && currentModel) {
-            // If enabling and not yet created, need to recreate
+        if (this.inertiaEllipsoids.size === 0 && currentModel) {
             this.extractInertialProperties(currentModel);
         } else {
-            // Otherwise just toggle visibility
-            this.inertiaEllipsoids.forEach(ellipsoid => {
-                ellipsoid.visible = show;
+            this.inertiaEllipsoids.forEach((ellipsoid, linkName) => {
+                ellipsoid.visible = show || this.perLinkInertia.has(linkName);
             });
         }
+    }
+
+    /**
+     * Toggle COM for a single link
+     */
+    toggleLinkCOM(linkName, show) {
+        if (show) {
+            this.perLinkCOM.add(linkName);
+        } else {
+            this.perLinkCOM.delete(linkName);
+        }
+        const marker = this.comMarkers.get(linkName);
+        if (marker) {
+            marker.visible = show || this.showCOM;
+        }
+    }
+
+    /**
+     * Toggle inertia for a single link
+     */
+    toggleLinkInertia(linkName, show, currentModel) {
+        if (show) {
+            this.perLinkInertia.add(linkName);
+        } else {
+            this.perLinkInertia.delete(linkName);
+        }
+        let ellipsoid = this.inertiaEllipsoids.get(linkName);
+
+        // Create on demand if not yet created
+        if (!ellipsoid && show && currentModel) {
+            const link = currentModel.links.get(linkName);
+            if (link?.inertial && (link.inertial.ixx !== undefined || link.inertial.inertia)) {
+                const comPosition = this._getComPosition(link.inertial);
+                this.createInertiaEllipsoid(currentModel, link, comPosition, link.inertial);
+                ellipsoid = this.inertiaEllipsoids.get(linkName);
+            }
+        }
+
+        if (ellipsoid) {
+            ellipsoid.visible = show || this.showInertia;
+        }
+    }
+
+    isLinkCOMVisible(linkName) {
+        const marker = this.comMarkers.get(linkName);
+        return marker ? marker.visible : false;
+    }
+
+    isLinkInertiaVisible(linkName) {
+        const ellipsoid = this.inertiaEllipsoids.get(linkName);
+        return ellipsoid ? ellipsoid.visible : false;
     }
 
     /**
@@ -397,8 +466,10 @@ export class InertialVisualization {
         this.inertiaEllipsoids.forEach(ellipsoid => {
             if (ellipsoid.parent) ellipsoid.parent.remove(ellipsoid);
         });
-        this.comMarkers = [];
-        this.inertiaEllipsoids = [];
+        this.comMarkers = new Map();
+        this.inertiaEllipsoids = new Map();
+        this.perLinkCOM.clear();
+        this.perLinkInertia.clear();
     }
 }
 

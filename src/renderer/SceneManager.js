@@ -867,8 +867,13 @@ export class SceneManager {
         // Check if single mesh model (no joints)
         const isSingleMesh = !this.currentModel || !this.currentModel.joints || this.currentModel.joints.size === 0;
 
+        const hasPerLinkOverrides =
+            this.inertialVisualization.perLinkCOM.size > 0 ||
+            this.axesManager.perLinkAxes.size > 0 ||
+            this.axesManager.perLinkJointAxes.size > 0;
+
         this.visualizationManager.updateVisualTransparency(
-            this.inertialVisualization.showCOM,
+            this.inertialVisualization.showCOM || hasPerLinkOverrides,
             this.axesManager.showAxesEnabled,
             this.axesManager.showJointAxesEnabled,
             isSingleMesh

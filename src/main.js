@@ -16,6 +16,7 @@ import { MeasurementController } from './controllers/MeasurementController.js';
 import { USDViewerManager } from './renderer/USDViewerManager.js';
 import { MujocoSimulationManager } from './renderer/MujocoSimulationManager.js';
 import { i18n } from './utils/i18n.js';
+import { findParentLink } from './utils/JointDragControls.js';
 
 // Expose d3 globally for PanelManager
 window.d3 = d3;
@@ -187,6 +188,9 @@ class App {
 
             // Setup canvas click handler
             this.setupCanvasClickHandler(canvas);
+
+            // Setup canvas right-click context menu
+            this.setupCanvasContextMenu(canvas);
 
             // Initialize code editor manager
             this.codeEditorManager = new CodeEditorManager();
@@ -643,6 +647,54 @@ class App {
 
             mouseDownPos = null;
         }, true);
+    }
+
+    /**
+     * Setup canvas right-click context menu for per-link visualization
+     */
+    setupCanvasContextMenu(canvas) {
+        canvas.addEventListener('contextmenu', (event) => {
+            if (!this.sceneManager || !this.sceneManager.currentModel || !this.modelGraphView) return;
+
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, this.sceneManager.camera);
+            const model = this.sceneManager.currentModel;
+            if (!model.threeObject) return;
+
+            const intersects = raycaster.intersectObject(model.threeObject, true);
+
+            // Filter out collision meshes and helper objects
+            const validHit = intersects.find(hit => {
+                const obj = hit.object;
+                if (!obj.isMesh) return false;
+                if (obj.userData?.isCollision || obj.userData?.isCollisionGeom) return false;
+                if (obj.userData?.isCenterOfMass || obj.userData?.isInertiaBox) return false;
+                // Check parent chain for collision
+                let p = obj.parent;
+                while (p) {
+                    if (p.isURDFCollider) return false;
+                    p = p.parent;
+                }
+                return true;
+            });
+
+            if (!validHit) return;
+
+            const linkInfo = findParentLink(validHit.object, model);
+            if (!linkInfo) return;
+
+            // Found a link - prevent default (stops OrbitControls pan context menu)
+            event.preventDefault();
+            event.stopPropagation();
+
+            // Reuse the ModelGraphView context menu (pass null for nodeColors/nodeElement)
+            this.modelGraphView.showContextMenu(event, linkInfo.name, model, null, null);
+        });
     }
 
     /**

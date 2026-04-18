@@ -1124,6 +1124,63 @@
             white-space: pre-wrap;
         }
 
+        /* Context menu styles */
+        #graph-context-menu {
+            position: fixed;
+            z-index: 1000;
+            min-width: 160px;
+            padding: 4px 0;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px) saturate(150%);
+            -webkit-backdrop-filter: blur(20px) saturate(150%);
+            border: 0.5px solid var(--glass-border);
+            border-radius: 8px;
+            box-shadow: var(--glass-shadow);
+            font-size: 13px;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+        }
+
+        .context-menu-item {
+            padding: 6px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+            transition: background 0.15s;
+            user-select: none;
+        }
+
+        .context-menu-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        [data-theme="light"] .context-menu-item:hover {
+            background: rgba(0, 0, 0, 0.06);
+        }
+
+        .context-menu-item.disabled {
+            opacity: 0.35;
+            pointer-events: none;
+        }
+
+        .context-menu-check {
+            width: 14px;
+            text-align: center;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .context-menu-check.checked::before {
+            content: '\2713';
+        }
+
+        .context-menu-divider {
+            height: 1px;
+            margin: 4px 8px;
+            background: var(--glass-border);
+        }
+
         /* File tree styles */
         .file-tree {
             font-size: 13px;
@@ -3054,6 +3111,30 @@
                 <div id="hover-link-mass"></div>
                 <div id="hover-link-pose"></div>
                 <div id="hover-merged-links"></div>
+            </div>
+
+            <div id="graph-context-menu" style="display: none;">
+                <div class="context-menu-item" data-action="toggle-visual">
+                    <span class="context-menu-check checked"></span>
+                    <span data-i18n="visual">Visual</span>
+                </div>
+                <div class="context-menu-divider"></div>
+                <div class="context-menu-item" data-action="toggle-axes">
+                    <span class="context-menu-check"></span>
+                    <span data-i18n="axes">Axes</span>
+                </div>
+                <div class="context-menu-item" data-action="toggle-joint-axis">
+                    <span class="context-menu-check"></span>
+                    <span data-i18n="jointAxes">Joint Axis</span>
+                </div>
+                <div class="context-menu-item" data-action="toggle-com">
+                    <span class="context-menu-check"></span>
+                    <span data-i18n="com">COM</span>
+                </div>
+                <div class="context-menu-item" data-action="toggle-inertia">
+                    <span class="context-menu-check"></span>
+                    <span data-i18n="inertia">Inertia</span>
+                </div>
             </div>
 
             <div id="floating-help-panel" class="floating-panel" style="display: none;">

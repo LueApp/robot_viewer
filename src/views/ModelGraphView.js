@@ -12,6 +12,10 @@ export class ModelGraphView {
         this.currentZoom = null; // Save current zoom behavior
         this.currentSvg = null; // Save current SVG selector
         this.currentContainer = null; // Save current container
+        this._contextLinkName = null;
+        this._contextModel = null;
+        this._contextDismissHandler = null;
+        this.setupContextMenuActions();
     }
 
     /**
@@ -393,7 +397,7 @@ export class ModelGraphView {
             }
         });
 
-        // Right-click: toggle link visibility
+        // Right-click: toggle all visualizations for the link (visual, axes, COM, inertia)
         node.on('contextmenu', (event, d) => {
             event.preventDefault();
             event.stopPropagation();
@@ -401,7 +405,16 @@ export class ModelGraphView {
             if (!this.sceneManager || !d.data.data) return;
 
             const linkName = d.data.name;
-            const isVisible = this.sceneManager.visualizationManager.toggleLinkVisibility(linkName, this.sceneManager.currentModel);
+            const sm = this.sceneManager;
+            const isVisible = sm.visualizationManager.toggleLinkVisibility(linkName, sm.currentModel);
+
+            // Also toggle per-link axes, joint axis, COM, inertia to match
+            sm.axesManager.toggleLinkAxes(linkName, isVisible);
+            sm.axesManager.toggleLinkJointAxis(linkName, isVisible, model);
+            sm.inertialVisualization.toggleLinkCOM(linkName, isVisible);
+            sm.inertialVisualization.toggleLinkInertia(linkName, isVisible, sm.currentModel);
+            sm.updateVisualTransparency();
+            sm.redraw();
 
             const nodeElement = d3.select(event.currentTarget);
             if (!isVisible) {
@@ -572,6 +585,180 @@ export class ModelGraphView {
         setTimeout(() => {
             this.fitToView(false);
         }, 50);
+    }
+
+    /**
+     * Show context menu for a link node
+     */
+    showContextMenu(event, linkName, model, nodeColors, nodeElement) {
+        const menu = document.getElementById('graph-context-menu');
+        if (!menu) return;
+
+        this._contextLinkName = linkName;
+        this._contextModel = model;
+        this._contextNodeColors = nodeColors;
+        this._contextNodeElement = nodeElement;
+
+        // Update check marks based on current visibility state
+        const items = menu.querySelectorAll('.context-menu-item');
+        items.forEach(item => {
+            const action = item.dataset.action;
+            const check = item.querySelector('.context-menu-check');
+            let isActive = false;
+
+            switch (action) {
+                case 'toggle-visual':
+                    isActive = !this.sceneManager.visualizationManager.isLinkHidden(linkName);
+                    item.classList.remove('disabled');
+                    break;
+                case 'toggle-axes':
+                    isActive = this.sceneManager.axesManager.isLinkAxesVisible(linkName);
+                    item.classList.remove('disabled');
+                    break;
+                case 'toggle-joint-axis':
+                    if (this.sceneManager.axesManager.hasJointAxis(linkName, model)) {
+                        isActive = this.sceneManager.axesManager.isLinkJointAxisVisible(linkName);
+                        item.classList.remove('disabled');
+                    } else {
+                        isActive = false;
+                        item.classList.add('disabled');
+                    }
+                    break;
+                case 'toggle-com':
+                    isActive = this.sceneManager.inertialVisualization.isLinkCOMVisible(linkName);
+                    item.classList.remove('disabled');
+                    break;
+                case 'toggle-inertia':
+                    isActive = this.sceneManager.inertialVisualization.isLinkInertiaVisible(linkName);
+                    item.classList.remove('disabled');
+                    break;
+            }
+
+            if (isActive) {
+                check.classList.add('checked');
+            } else {
+                check.classList.remove('checked');
+            }
+        });
+
+        // Position menu at mouse cursor
+        menu.style.left = event.clientX + 'px';
+        menu.style.top = event.clientY + 'px';
+        menu.style.display = 'block';
+
+        // Ensure menu stays within viewport
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+            menu.style.left = (event.clientX - rect.width) + 'px';
+        }
+        if (rect.bottom > window.innerHeight) {
+            menu.style.top = (event.clientY - rect.height) + 'px';
+        }
+
+        // Remove previous dismiss handler
+        if (this._contextDismissHandler) {
+            document.removeEventListener('click', this._contextDismissHandler, true);
+            document.removeEventListener('contextmenu', this._contextDismissHandler, true);
+        }
+
+        // Setup dismiss handler
+        this._contextDismissHandler = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.style.display = 'none';
+                document.removeEventListener('click', this._contextDismissHandler, true);
+                document.removeEventListener('contextmenu', this._contextDismissHandler, true);
+                this._contextDismissHandler = null;
+            }
+        };
+        setTimeout(() => {
+            document.addEventListener('click', this._contextDismissHandler, true);
+            document.addEventListener('contextmenu', this._contextDismissHandler, true);
+        }, 0);
+    }
+
+    /**
+     * Setup context menu action handlers (called once in constructor)
+     */
+    setupContextMenuActions() {
+        const menu = document.getElementById('graph-context-menu');
+        if (!menu) return;
+
+        menu.addEventListener('click', (event) => {
+            const item = event.target.closest('.context-menu-item');
+            if (!item || item.classList.contains('disabled')) return;
+
+            const action = item.dataset.action;
+            const linkName = this._contextLinkName;
+            const model = this._contextModel;
+            if (!linkName || !this.sceneManager) return;
+
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const isLightTheme = currentTheme === 'light';
+
+            switch (action) {
+                case 'toggle-visual': {
+                    const isVisible = this.sceneManager.visualizationManager.toggleLinkVisibility(linkName, this.sceneManager.currentModel);
+                    this.updateNodeVisualState(linkName, isVisible);
+                    break;
+                }
+                case 'toggle-axes': {
+                    const current = this.sceneManager.axesManager.perLinkAxes.has(linkName);
+                    this.sceneManager.axesManager.toggleLinkAxes(linkName, !current);
+                    break;
+                }
+                case 'toggle-joint-axis': {
+                    const current = this.sceneManager.axesManager.perLinkJointAxes.has(linkName);
+                    this.sceneManager.axesManager.toggleLinkJointAxis(linkName, !current, model);
+                    break;
+                }
+                case 'toggle-com': {
+                    const current = this.sceneManager.inertialVisualization.isLinkCOMVisible(linkName);
+                    this.sceneManager.inertialVisualization.toggleLinkCOM(linkName, !current);
+                    break;
+                }
+                case 'toggle-inertia': {
+                    const current = this.sceneManager.inertialVisualization.isLinkInertiaVisible(linkName);
+                    this.sceneManager.inertialVisualization.toggleLinkInertia(linkName, !current, this.sceneManager.currentModel);
+                    break;
+                }
+            }
+
+            this.sceneManager.updateVisualTransparency();
+            this.sceneManager.redraw();
+
+            // Hide menu after action
+            menu.style.display = 'none';
+        });
+    }
+
+    /**
+     * Update graph node visual state when link visibility changes
+     */
+    updateNodeVisualState(linkName, isVisible) {
+        const nodeElement = this._contextNodeElement;
+        const nodeColors = this._contextNodeColors;
+        if (!nodeElement || !nodeColors) return;
+
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+        const isLightTheme = currentTheme === 'light';
+
+        if (!isVisible) {
+            nodeElement.classed('hidden', true);
+            nodeElement.select('.node-bg')
+                .style('fill', isLightTheme ? 'rgba(0, 0, 0, 0.1)' : '#1a1a1a')
+                .style('opacity', '0.5');
+            nodeElement.select('text')
+                .style('fill', isLightTheme ? '#999' : '#666')
+                .style('opacity', '0.6');
+        } else {
+            nodeElement.classed('hidden', false);
+            nodeElement.select('.node-bg')
+                .style('fill', nodeColors.bg)
+                .style('opacity', '1');
+            nodeElement.select('text')
+                .style('fill', nodeColors.text)
+                .style('opacity', '1');
+        }
     }
 
     /**

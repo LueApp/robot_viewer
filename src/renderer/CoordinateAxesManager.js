@@ -10,6 +10,8 @@ export class CoordinateAxesManager {
         this.jointAxesHelpers = new Map();
         this.showAxesEnabled = false;
         this.showJointAxesEnabled = false;
+        this.perLinkAxes = new Set();
+        this.perLinkJointAxes = new Set();
     }
 
     /**
@@ -234,8 +236,8 @@ export class CoordinateAxesManager {
         // Save reference
         this.linkAxesHelpers.set(linkName, axesGroup);
 
-        // Decide whether to show based on current setting
-        axesGroup.visible = this.showAxesEnabled;
+        // Decide whether to show based on current setting and per-link overrides
+        axesGroup.visible = this.showAxesEnabled || this.perLinkAxes.has(linkName);
 
         return axesGroup;
     }
@@ -315,8 +317,9 @@ export class CoordinateAxesManager {
             isAttached: false
         });
 
-        // Decide whether to add to scene based on current setting
-        if (this.showJointAxesEnabled) {
+        // Decide whether to add to scene based on current setting and per-link overrides
+        const shouldShow = this.showJointAxesEnabled || (joint.child && this.perLinkJointAxes.has(joint.child));
+        if (shouldShow) {
             jointObject.add(axisGroup);
             this.jointAxesHelpers.get(jointName).isAttached = true;
         }
@@ -407,10 +410,11 @@ export class CoordinateAxesManager {
     hideAllAxes() {
         this.showAxesEnabled = false;
 
-        // Hide all link axes
-        this.linkAxesHelpers.forEach((axes) => {
-            axes.visible = false;
-        });    }
+        // Hide all link axes, but respect per-link overrides
+        this.linkAxesHelpers.forEach((axes, linkName) => {
+            axes.visible = this.perLinkAxes.has(linkName);
+        });
+    }
 
     /**
      * Show all joint axes
@@ -432,13 +436,17 @@ export class CoordinateAxesManager {
     hideAllJointAxes() {
         this.showJointAxesEnabled = false;
 
-        // Hide all joint axes (remove from scene)
+        // Hide all joint axes, but respect per-link overrides
         this.jointAxesHelpers.forEach((axisInfo, jointName) => {
-            if (axisInfo.isAttached && axisInfo.parent) {
+            const childLink = axisInfo.joint?.child;
+            const hasPerLinkOverride = childLink && this.perLinkJointAxes.has(childLink);
+
+            if (axisInfo.isAttached && axisInfo.parent && !hasPerLinkOverride) {
                 axisInfo.parent.remove(axisInfo.mesh);
                 axisInfo.isAttached = false;
             }
-        });    }
+        });
+    }
 
     /**
      * Temporarily show only specified joint axis (for slider drag/model drag)
@@ -475,15 +483,80 @@ export class CoordinateAxesManager {
             }
         });
 
-        // If joint axes switch is on, show all axes
-        if (this.showJointAxesEnabled) {
-            this.jointAxesHelpers.forEach((axisInfo, jointName) => {
-                if (!axisInfo.isAttached && axisInfo.parent) {
-                    axisInfo.parent.add(axisInfo.mesh);
-                    axisInfo.isAttached = true;
+        // Show axes based on global toggle and per-link overrides
+        this.jointAxesHelpers.forEach((axisInfo, jointName) => {
+            const childLink = axisInfo.joint?.child;
+            const shouldShow = this.showJointAxesEnabled || (childLink && this.perLinkJointAxes.has(childLink));
+
+            if (shouldShow && !axisInfo.isAttached && axisInfo.parent) {
+                axisInfo.parent.add(axisInfo.mesh);
+                axisInfo.isAttached = true;
+            }
+        });
+    }
+
+    /**
+     * Toggle axes for a single link
+     */
+    toggleLinkAxes(linkName, show) {
+        if (show) {
+            this.perLinkAxes.add(linkName);
+        } else {
+            this.perLinkAxes.delete(linkName);
+        }
+        const axes = this.linkAxesHelpers.get(linkName);
+        if (axes) {
+            axes.visible = show || this.showAxesEnabled;
+        }
+    }
+
+    /**
+     * Toggle joint axis for a single link (the joint whose child is this link)
+     */
+    toggleLinkJointAxis(linkName, show, model) {
+        if (show) {
+            this.perLinkJointAxes.add(linkName);
+        } else {
+            this.perLinkJointAxes.delete(linkName);
+        }
+        if (model && model.joints) {
+            model.joints.forEach((joint, jointName) => {
+                if (joint.child === linkName) {
+                    const axisInfo = this.jointAxesHelpers.get(jointName);
+                    if (axisInfo) {
+                        if (show && !axisInfo.isAttached && axisInfo.parent) {
+                            axisInfo.parent.add(axisInfo.mesh);
+                            axisInfo.isAttached = true;
+                        } else if (!show && !this.showJointAxesEnabled && axisInfo.isAttached && axisInfo.parent) {
+                            axisInfo.parent.remove(axisInfo.mesh);
+                            axisInfo.isAttached = false;
+                        }
+                    }
                 }
             });
         }
+    }
+
+    isLinkAxesVisible(linkName) {
+        const axes = this.linkAxesHelpers.get(linkName);
+        return axes ? axes.visible : false;
+    }
+
+    isLinkJointAxisVisible(linkName) {
+        return this.perLinkJointAxes.has(linkName) || this.showJointAxesEnabled;
+    }
+
+    /**
+     * Check if a link has an associated parent joint axis
+     */
+    hasJointAxis(linkName, model) {
+        if (!model || !model.joints) return false;
+        for (const [jointName, joint] of model.joints) {
+            if (joint.child === linkName && this.jointAxesHelpers.has(jointName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -541,6 +614,8 @@ export class CoordinateAxesManager {
     clear() {
         this.clearAllLinkAxes();
         this.clearAllJointAxes();
+        this.perLinkAxes.clear();
+        this.perLinkJointAxes.clear();
     }
 }
 

@@ -7,6 +7,36 @@ import * as THREE from 'three';
 import { loadMeshFile, ensureMeshHasPhongMaterial, getLoaders } from '../utils/MeshLoader.js';
 
 export class MJCFAdapter {
+    static getGeomSignalText(geomEl, meshRef = null, meshMap = null) {
+        const signalParts = [
+            geomEl.getAttribute('name'),
+            geomEl.getAttribute('class'),
+            meshRef
+        ];
+
+        if (meshRef && meshMap && meshMap.has(meshRef)) {
+            const meshData = meshMap.get(meshRef);
+            signalParts.push(meshData?.path);
+        }
+
+        return signalParts.filter(Boolean).join(' ').toLowerCase();
+    }
+
+    static hasCollisionSignal(geomEl, meshRef = null, meshMap = null) {
+        const signalText = this.getGeomSignalText(geomEl, meshRef, meshMap);
+        return /(^|[^a-z0-9])(collision|collider|col)([^a-z0-9]|$)/i.test(signalText);
+    }
+
+    static hasVisualSignal(geomEl, inheritedProps, groupNum, hasRgba) {
+        return (
+            groupNum === 1 ||
+            groupNum === 2 ||
+            hasRgba ||
+            geomEl.hasAttribute('material') ||
+            inheritedProps.material !== null
+        );
+    }
+
     /**
      * Process include tags in MJCF XML
      * Replaces <include file="path"/> with the content of the referenced file
@@ -197,7 +227,6 @@ export class MJCFAdapter {
                 // Use inherited group if not explicitly defined
                 const groupNum = group !== null ? parseInt(group) : 
                     (inheritedProps.group !== null ? inheritedProps.group : 0);
-                const geomName = (geomEl.getAttribute('name') || '').toLowerCase();
                 const hasRgba = geomEl.hasAttribute('rgba') || inheritedProps.rgba !== null;
                 const meshRef = geomEl.getAttribute('mesh');
                 
@@ -225,7 +254,7 @@ export class MJCFAdapter {
                     } else if (groupNum === 2 || groupNum === 1) {
                         // group=1,2 are visual
                         isCollisionGeom = false;
-                    } else if (geomName.includes('collision')) {
+                    } else if (this.hasCollisionSignal(geomEl, meshRef, meshMap)) {
                         isCollisionGeom = true;
                     } else if (seenMeshes.has(meshRef)) {
                         if (hasRgba || (contypeNum === 0 && conaffinityNum === 0)) {
@@ -238,7 +267,7 @@ export class MJCFAdapter {
                     } else if (hasRgba) {
                         isCollisionGeom = false;
                     } else {
-                        isCollisionGeom = false;
+                        isCollisionGeom = !this.hasVisualSignal(geomEl, inheritedProps, groupNum, hasRgba);
                     }
                 }
 
@@ -681,7 +710,6 @@ export class MJCFAdapter {
                 // Use inherited group if not explicitly defined
                 const groupNum = group !== null ? parseInt(group) : 
                     (inheritedProps.group !== null ? inheritedProps.group : 0);
-                const geomName = (geomEl.getAttribute('name') || '').toLowerCase();
                 const hasRgba = geomEl.hasAttribute('rgba') || inheritedProps.rgba !== null;
                 const meshRef = geomEl.getAttribute('mesh');
                 // Use inherited type if not explicitly defined
@@ -723,7 +751,7 @@ export class MJCFAdapter {
                         isCollisionGeom = false;
                     }
                     // Strategy 3: Name contains collision (indicates collision-specific)
-                    else if (geomName.includes('collision')) {
+                    else if (this.hasCollisionSignal(geomEl, meshRef, meshMap)) {
                         isCollisionGeom = true;
                     }
                     // Strategy 4: If same mesh already added as visual
@@ -746,11 +774,11 @@ export class MJCFAdapter {
                     else if (hasRgba) {
                         isCollisionGeom = false;
                     }
-                    // Strategy 7: Default for mesh: treat as visual (for display purposes)
+                    // Strategy 7: Default mesh behavior
                     else {
-                        // No explicit markers, but it's a mesh - default to visual for display
-                        // (collision might be handled by a separate geom with same mesh)
-                        isCollisionGeom = false;
+                        // Unmarked mesh geoms participate in collision by default in MJCF.
+                        // Treat them as visual only when they carry explicit visual signals.
+                        isCollisionGeom = !this.hasVisualSignal(geomEl, inheritedProps, groupNum, hasRgba);
                     }
                 }
 
@@ -2087,4 +2115,3 @@ export class MJCFAdapter {
         }
     }
 }
-

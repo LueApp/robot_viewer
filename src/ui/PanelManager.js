@@ -260,6 +260,7 @@ export class PanelManager {
     initAllPanels() {
         this.registerPanel('floating-files-panel');
         this.registerPanel('floating-joints-panel');
+        this.registerPanel('floating-gravity-panel');
         this.registerPanel('floating-model-tree');
         this.registerPanel('floating-help-panel');
         this.registerPanel('code-editor-panel', '.code-editor-header');

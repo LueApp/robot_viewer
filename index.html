@@ -2882,6 +2882,101 @@
             flex-shrink: 0;
         }
 
+        /* Inline gravity-compensation readout: hidden unless gravity mode is on */
+        .joint-gravity-field {
+            display: none;
+        }
+
+        body.gravity-mode .joint-gravity-field {
+            display: flex;
+        }
+
+        .joint-gravity-value {
+            min-width: 52px;
+            padding: 2px 4px;
+            font-size: 9px;
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+            text-align: right;
+            color: var(--accent, #6ea8fe);
+            white-space: nowrap;
+        }
+
+        /* Gravity compensation summary panel */
+        #floating-gravity-panel {
+            top: 80px;
+            right: 20px;
+            left: auto;
+            width: 300px;
+            height: auto;
+            max-height: calc(100vh - 120px);
+        }
+
+        #gravity-panel-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            overflow: hidden;
+        }
+
+        .gravity-summary-head,
+        .gravity-summary-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .gravity-summary-head {
+            font-weight: 600;
+            color: var(--text-tertiary);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+            position: sticky;
+            top: 0;
+            background: inherit;
+        }
+
+        #gravity-summary-body {
+            overflow-y: auto;
+        }
+
+        .gravity-summary-row:nth-child(even) {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .gravity-summary-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .gravity-summary-value {
+            flex-shrink: 0;
+            font-weight: 600;
+            color: var(--accent, #6ea8fe);
+            text-align: right;
+        }
+
+        .gravity-summary-empty {
+            padding: 12px 10px;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            text-align: center;
+        }
+
+        .gravity-summary-total {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border-top: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--text-secondary);
+        }
+
         .joint-extra-label {
             font-size: 9px;
             color: var(--text-tertiary);
@@ -3415,6 +3510,9 @@
                     <button class="control-button" id="show-com" data-checked="false">
                         <span data-i18n="com"></span>
                     </button>
+                    <button class="control-button" id="show-gravity" data-checked="false">
+                        <span data-i18n="gravity"></span>
+                    </button>
                     <button class="control-button" id="toggle-axes-btn" data-checked="false">
                         <span data-i18n="axes"></span>
                     </button>
@@ -3536,6 +3634,25 @@
                 </div>
                 <div class="floating-panel-content" id="joint-controls">
                     <div class="empty-state" data-i18n="noModel"></div>
+                </div>
+            </div>
+
+            <div id="floating-gravity-panel" class="floating-panel" style="display: none;">
+                <div class="floating-panel-header">
+                    <span data-i18n="gravityCompensation"></span>
+                    <button class="panel-maximize-btn" data-panel-id="floating-gravity-panel">⛶</button>
+                    <button class="panel-close-btn" data-panel="floating-gravity-panel">✕</button>
+                </div>
+                <div class="floating-panel-content" id="gravity-panel-content">
+                    <div class="gravity-summary-head">
+                        <span class="gravity-summary-name" data-i18n="joint"></span>
+                        <span class="gravity-summary-value" data-i18n="gravityTorque"></span>
+                    </div>
+                    <div id="gravity-summary-body"></div>
+                    <div class="gravity-summary-total">
+                        <span data-i18n="totalMass"></span>
+                        <span id="gravity-total-mass">0.000 kg</span>
+                    </div>
                 </div>
             </div>
 

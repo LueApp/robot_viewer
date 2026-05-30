@@ -458,6 +458,25 @@ export class JointControlsUI {
             });
         }
 
+        // Gravity-compensation torque (read-only; shown only in gravity mode)
+        const gravityField = document.createElement('div');
+        gravityField.className = 'joint-extra-field joint-gravity-field';
+
+        const gravityLabel = document.createElement('label');
+        gravityLabel.className = 'joint-extra-label';
+        gravityLabel.textContent = 'g:';
+        gravityLabel.title = window.i18n.t('gravityTorque');
+
+        const gravityValue = document.createElement('span');
+        gravityValue.className = 'joint-gravity-value';
+        gravityValue.setAttribute('data-joint-gravity', joint.name);
+        gravityValue.textContent = '—';
+        gravityValue.title = window.i18n.t('gravityTorque');
+
+        gravityField.appendChild(gravityLabel);
+        gravityField.appendChild(gravityValue);
+        header.appendChild(gravityField);
+
         // Slider events
         slider.addEventListener('mousedown', () => {
             this.sceneManager.axesManager.showOnlyJointAxis(joint);

@@ -17,6 +17,7 @@ export class UIController {
         const showCollisionBtn = document.getElementById('show-collision');
         const showComBtn = document.getElementById('show-com');
         const showInertiaBtn = document.getElementById('show-inertia');
+        const showGravityBtn = document.getElementById('show-gravity');
         const ignoreLimitsBtn = document.getElementById('ignore-limits');
 
         // Helper function: toggle button state
@@ -52,6 +53,9 @@ export class UIController {
         }
         if (this.sceneManager && showInertiaBtn) {
             this.sceneManager.inertialVisualization.showInertia = showInertiaBtn.classList.contains('active');
+        }
+        if (this.sceneManager && showGravityBtn && this.sceneManager.gravityUI) {
+            this.sceneManager.gravityUI.setEnabled(showGravityBtn.classList.contains('active'));
         }
         if (this.sceneManager && ignoreLimitsBtn) {
             this.sceneManager.ignoreLimits = !ignoreLimitsBtn.classList.contains('active');
@@ -137,6 +141,31 @@ export class UIController {
                     this.sceneManager.render();
                 });
             });
+        }
+
+        if (showGravityBtn) {
+            showGravityBtn.addEventListener('click', () => {
+                toggleButton(showGravityBtn, (newState) => {
+                    if (this.sceneManager.gravityUI) {
+                        this.sceneManager.gravityUI.setEnabled(newState);
+                    }
+                });
+            });
+
+            // Closing the summary panel turns the whole feature off so the
+            // toggle button and inline fields stay in sync.
+            const gravityCloseBtn = document.querySelector('.panel-close-btn[data-panel="floating-gravity-panel"]');
+            if (gravityCloseBtn) {
+                gravityCloseBtn.addEventListener('click', () => {
+                    if (showGravityBtn.classList.contains('active')) {
+                        showGravityBtn.classList.remove('active');
+                        showGravityBtn.setAttribute('data-checked', 'false');
+                    }
+                    if (this.sceneManager.gravityUI) {
+                        this.sceneManager.gravityUI.setEnabled(false);
+                    }
+                });
+            }
         }
 
         if (ignoreLimitsBtn) {

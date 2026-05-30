@@ -45,7 +45,11 @@ export const translations = {
         'vectorInputPlaceholder': '输入关节值，如: 0.1, 0.2, 0.3 ...',
         'vectorApply': '应用',
         'vectorMismatch': '值数量 ({count}) 与可控关节数量 ({expected}) 不匹配',
+        'vectorTooShort': '输入了 {count} 个值，需要 {expected} 个可控关节值。是否在末尾补 0 后应用？',
+        'vectorAppendZeros': '末尾补 0',
+        'vectorInvalid': '向量中包含无效数值',
         'vectorApplied': '已应用关节向量',
+        'cancel': '取消',
 
         // MuJoCo 仿真
         'mujocoReset': '重置',
@@ -205,7 +209,11 @@ export const translations = {
         'vectorInputPlaceholder': 'Enter joint values, e.g.: 0.1, 0.2, 0.3 ...',
         'vectorApply': 'Apply',
         'vectorMismatch': 'Value count ({count}) does not match controllable joints ({expected})',
+        'vectorTooShort': 'You entered {count} values, but {expected} controllable joint values are required. Append trailing zeros and apply?',
+        'vectorAppendZeros': 'Append zeros',
+        'vectorInvalid': 'Vector contains invalid values',
         'vectorApplied': 'Joint vector applied',
+        'cancel': 'Cancel',
 
         // MuJoCo simulation
         'mujocoReset': 'Reset',
@@ -385,5 +393,4 @@ class I18n {
 
 // 创建全局实例
 export const i18n = new I18n();
-
 

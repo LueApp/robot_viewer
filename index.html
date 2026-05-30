@@ -2118,53 +2118,6 @@
             background: rgba(0, 0, 0, 0.05);
         }
 
-        /* Vector input button */
-        #floating-joints-panel #vector-input-btn {
-            padding: 5px 12px;
-            height: auto;
-            background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            color: var(--text-secondary);
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.3s var(--spring);
-            flex-shrink: 0;
-            pointer-events: auto;
-            min-width: 42px;
-        }
-
-        #floating-joints-panel #vector-input-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--text-primary);
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-        }
-
-        #floating-joints-panel #vector-input-btn:active {
-            transform: scale(0.98);
-        }
-
-        #floating-joints-panel #vector-input-btn.active {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-            box-shadow: 0 1px 4px rgba(10, 132, 255, 0.3);
-        }
-
-        #floating-joints-panel #vector-input-btn.active:hover {
-            box-shadow: 0 4px 16px rgba(10, 132, 255, 0.4);
-            transform: scale(1.05);
-        }
-
-        [data-theme="light"] #floating-joints-panel #vector-input-btn {
-            border-color: rgba(0, 0, 0, 0.1);
-        }
-
-        [data-theme="light"] #floating-joints-panel #vector-input-btn:hover {
-            background: rgba(0, 0, 0, 0.05);
-        }
-
         /* Vector input area */
         #vector-input-area {
             padding: 8px 16px;
@@ -2228,6 +2181,89 @@
 
         #vector-apply-btn:active {
             transform: scale(0.96);
+        }
+
+        #vector-input-notification {
+            margin-top: 8px;
+            padding: 8px 10px;
+            background: rgba(255, 159, 10, 0.12);
+            border: 1px solid rgba(255, 159, 10, 0.24);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 12px;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        #vector-input-notification[hidden] {
+            display: none;
+        }
+
+        .vector-input-notification-message {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .vector-input-notification-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .vector-input-notification-actions button {
+            padding: 4px 9px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 7px;
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.08);
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .vector-input-notification-actions button:hover {
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .vector-input-notification-actions .primary {
+            color: white;
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        [data-theme="light"] #vector-input-notification {
+            background: rgba(255, 149, 0, 0.12);
+            border-color: rgba(255, 149, 0, 0.28);
+        }
+
+        [data-theme="light"] .vector-input-notification-actions button {
+            border-color: rgba(0, 0, 0, 0.1);
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        [data-theme="light"] .vector-input-notification-actions button:hover {
+            background: rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="light"] .vector-input-notification-actions .primary {
+            color: white;
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        @media (max-width: 520px) {
+            #vector-input-notification {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .vector-input-notification-actions {
+                justify-content: flex-end;
+            }
         }
 
         .model-graph-content {
@@ -3619,18 +3655,16 @@
                         <button class="control-button active" id="ignore-limits" data-checked="true">
                             <span data-i18n="limits"></span>
                         </button>
-                        <button class="control-button" id="vector-input-btn">
-                            <span data-i18n="vectorInput"></span>
-                        </button>
                         <button class="panel-maximize-btn" data-panel-id="floating-joints-panel">⛶</button>
                         <button class="panel-close-btn" data-panel="floating-joints-panel">✕</button>
                     </div>
                 </div>
-                <div id="vector-input-area" style="display: none;">
+                <div id="vector-input-area">
                     <div class="vector-input-row">
                         <input type="text" id="vector-input-field" data-i18n="vectorInputPlaceholder" autocomplete="off" spellcheck="false">
                         <button id="vector-apply-btn" data-i18n="vectorApply"></button>
                     </div>
+                    <div id="vector-input-notification" role="alert" aria-live="polite" hidden></div>
                 </div>
                 <div class="floating-panel-content" id="joint-controls">
                     <div class="empty-state" data-i18n="noModel"></div>

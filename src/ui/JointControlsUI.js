@@ -458,6 +458,25 @@ export class JointControlsUI {
             });
         }
 
+        // Gravity-compensation torque (read-only; shown only in gravity mode)
+        const gravityField = document.createElement('div');
+        gravityField.className = 'joint-extra-field joint-gravity-field';
+
+        const gravityLabel = document.createElement('label');
+        gravityLabel.className = 'joint-extra-label';
+        gravityLabel.textContent = 'g:';
+        gravityLabel.title = window.i18n.t('gravityTorque');
+
+        const gravityValue = document.createElement('span');
+        gravityValue.className = 'joint-gravity-value';
+        gravityValue.setAttribute('data-joint-gravity', joint.name);
+        gravityValue.textContent = '—';
+        gravityValue.title = window.i18n.t('gravityTorque');
+
+        gravityField.appendChild(gravityLabel);
+        gravityField.appendChild(gravityValue);
+        header.appendChild(gravityField);
+
         // Slider events
         slider.addEventListener('mousedown', () => {
             this.sceneManager.axesManager.showOnlyJointAxis(joint);
@@ -601,9 +620,10 @@ export class JointControlsUI {
      * Set all joints from a vector of values (in display unit)
      * @param {UnifiedRobotModel} model
      * @param {string} vectorText - plain text like "0.1, 0.2, 0.3" or "[0.1 0.2 0.3]"
-     * @returns {{ success: boolean, message?: string }}
+     * @param {{ padZeros?: boolean }} options
+     * @returns {{ success: boolean, reason?: string, message?: string, count?: number, expected?: number }}
      */
-    setAllJoints(model, vectorText) {
+    setAllJoints(model, vectorText, options = {}) {
         if (!model || !model.joints) {
             return { success: false };
         }
@@ -626,14 +646,37 @@ export class JointControlsUI {
         const values = tokens.map(t => parseFloat(t));
 
         if (values.some(v => isNaN(v))) {
-            return { success: false };
+            return {
+                success: false,
+                reason: 'invalid',
+                message: window.i18n.t('vectorInvalid')
+            };
         }
 
-        if (values.length !== controllableJoints.length) {
+        if (values.length > controllableJoints.length) {
             const msg = window.i18n.t('vectorMismatch')
                 .replace('{count}', values.length)
                 .replace('{expected}', controllableJoints.length);
-            return { success: false, message: msg };
+            return { success: false, reason: 'too-long', message: msg };
+        }
+
+        if (values.length < controllableJoints.length) {
+            if (!options.padZeros) {
+                const msg = window.i18n.t('vectorTooShort')
+                    .replace('{count}', values.length)
+                    .replace('{expected}', controllableJoints.length);
+                return {
+                    success: false,
+                    reason: 'too-short',
+                    message: msg,
+                    count: values.length,
+                    expected: controllableJoints.length
+                };
+            }
+
+            while (values.length < controllableJoints.length) {
+                values.push(0);
+            }
         }
 
         // Apply values

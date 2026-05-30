@@ -12,6 +12,12 @@ export const translations = {
         'collision': '碰撞',
         'com': '质心',
         'inertia': '惯量',
+        'gravity': '重力补偿',
+        'gravityCompensation': '重力补偿力矩',
+        'gravityTorque': '重力补偿力矩',
+        'gravityNoMass': '模型无质量/惯量数据',
+        'joint': '关节',
+        'totalMass': '总质量',
         'axes': '坐标轴',
         'jointAxes': '关节轴',
         'shadow': '阴影',
@@ -39,7 +45,11 @@ export const translations = {
         'vectorInputPlaceholder': '输入关节值，如: 0.1, 0.2, 0.3 ...',
         'vectorApply': '应用',
         'vectorMismatch': '值数量 ({count}) 与可控关节数量 ({expected}) 不匹配',
+        'vectorTooShort': '输入了 {count} 个值，需要 {expected} 个可控关节值。是否在末尾补 0 后应用？',
+        'vectorAppendZeros': '末尾补 0',
+        'vectorInvalid': '向量中包含无效数值',
         'vectorApplied': '已应用关节向量',
+        'cancel': '取消',
 
         // MuJoCo 仿真
         'mujocoReset': '重置',
@@ -153,6 +163,12 @@ export const translations = {
         'collision': 'Collision',
         'com': 'COM',
         'inertia': 'Inertia',
+        'gravity': 'Gravity',
+        'gravityCompensation': 'Gravity Compensation',
+        'gravityTorque': 'Gravity Torque',
+        'gravityNoMass': 'Model has no mass/inertia data',
+        'joint': 'Joint',
+        'totalMass': 'Total Mass',
         'axes': 'Axes',
         'jointAxes': 'Joint Axes',
         'shadow': 'Shadow',
@@ -193,7 +209,11 @@ export const translations = {
         'vectorInputPlaceholder': 'Enter joint values, e.g.: 0.1, 0.2, 0.3 ...',
         'vectorApply': 'Apply',
         'vectorMismatch': 'Value count ({count}) does not match controllable joints ({expected})',
+        'vectorTooShort': 'You entered {count} values, but {expected} controllable joint values are required. Append trailing zeros and apply?',
+        'vectorAppendZeros': 'Append zeros',
+        'vectorInvalid': 'Vector contains invalid values',
         'vectorApplied': 'Joint vector applied',
+        'cancel': 'Cancel',
 
         // MuJoCo simulation
         'mujocoReset': 'Reset',
@@ -373,5 +393,4 @@ class I18n {
 
 // 创建全局实例
 export const i18n = new I18n();
-
 

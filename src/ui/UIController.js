@@ -17,6 +17,7 @@ export class UIController {
         const showCollisionBtn = document.getElementById('show-collision');
         const showComBtn = document.getElementById('show-com');
         const showInertiaBtn = document.getElementById('show-inertia');
+        const showGravityBtn = document.getElementById('show-gravity');
         const ignoreLimitsBtn = document.getElementById('ignore-limits');
 
         // Helper function: toggle button state
@@ -52,6 +53,9 @@ export class UIController {
         }
         if (this.sceneManager && showInertiaBtn) {
             this.sceneManager.inertialVisualization.showInertia = showInertiaBtn.classList.contains('active');
+        }
+        if (this.sceneManager && showGravityBtn && this.sceneManager.gravityUI) {
+            this.sceneManager.gravityUI.setEnabled(showGravityBtn.classList.contains('active'));
         }
         if (this.sceneManager && ignoreLimitsBtn) {
             this.sceneManager.ignoreLimits = !ignoreLimitsBtn.classList.contains('active');
@@ -139,6 +143,31 @@ export class UIController {
             });
         }
 
+        if (showGravityBtn) {
+            showGravityBtn.addEventListener('click', () => {
+                toggleButton(showGravityBtn, (newState) => {
+                    if (this.sceneManager.gravityUI) {
+                        this.sceneManager.gravityUI.setEnabled(newState);
+                    }
+                });
+            });
+
+            // Closing the summary panel turns the whole feature off so the
+            // toggle button and inline fields stay in sync.
+            const gravityCloseBtn = document.querySelector('.panel-close-btn[data-panel="floating-gravity-panel"]');
+            if (gravityCloseBtn) {
+                gravityCloseBtn.addEventListener('click', () => {
+                    if (showGravityBtn.classList.contains('active')) {
+                        showGravityBtn.classList.remove('active');
+                        showGravityBtn.setAttribute('data-checked', 'false');
+                    }
+                    if (this.sceneManager.gravityUI) {
+                        this.sceneManager.gravityUI.setEnabled(false);
+                    }
+                });
+            }
+        }
+
         if (ignoreLimitsBtn) {
             ignoreLimitsBtn.addEventListener('click', () => {
                 toggleButton(ignoreLimitsBtn, (newState) => {
@@ -186,29 +215,90 @@ export class UIController {
             });
         }
 
-        // Vector input toggle button
-        const vectorInputBtn = document.getElementById('vector-input-btn');
-        const vectorInputArea = document.getElementById('vector-input-area');
+        // Vector input
         const vectorInputField = document.getElementById('vector-input-field');
         const vectorApplyBtn = document.getElementById('vector-apply-btn');
+        const vectorInputNotification = document.getElementById('vector-input-notification');
 
-        if (vectorInputBtn && vectorInputArea) {
-            vectorInputBtn.addEventListener('click', () => {
-                const isVisible = vectorInputArea.style.display !== 'none';
-                vectorInputArea.style.display = isVisible ? 'none' : '';
-                vectorInputBtn.classList.toggle('active', !isVisible);
-                if (!isVisible && vectorInputField) {
-                    vectorInputField.focus();
-                }
-            });
-        }
+        const hideVectorNotification = () => {
+            if (!vectorInputNotification) return;
+
+            vectorInputNotification.hidden = true;
+            vectorInputNotification.innerHTML = '';
+        };
+
+        const showVectorNotification = (message, actions = []) => {
+            if (!vectorInputNotification) return;
+
+            vectorInputNotification.innerHTML = '';
+
+            const messageEl = document.createElement('div');
+            messageEl.className = 'vector-input-notification-message';
+            messageEl.textContent = message;
+            vectorInputNotification.appendChild(messageEl);
+
+            if (actions.length > 0) {
+                const actionsEl = document.createElement('div');
+                actionsEl.className = 'vector-input-notification-actions';
+
+                actions.forEach((action) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.textContent = action.label;
+                    if (action.primary) {
+                        button.classList.add('primary');
+                    }
+                    button.addEventListener('click', action.onClick);
+                    actionsEl.appendChild(button);
+                });
+
+                vectorInputNotification.appendChild(actionsEl);
+            }
+
+            vectorInputNotification.hidden = false;
+        };
 
         const applyVector = () => {
-            if (vectorInputField && vectorInputField.value.trim()) {
-                const result = this.onVectorInput?.(vectorInputField.value);
-                if (result?.success) {
-                    vectorInputField.value = '';
-                }
+            if (!vectorInputField) return;
+
+            const vectorText = vectorInputField.value.trim();
+            if (!vectorText) {
+                hideVectorNotification();
+                return;
+            }
+
+            const result = this.onVectorInput?.(vectorText);
+            if (result?.success) {
+                vectorInputField.value = '';
+                hideVectorNotification();
+                return;
+            }
+
+            if (result?.reason === 'too-short') {
+                showVectorNotification(result.message, [
+                    {
+                        label: window.i18n?.t('vectorAppendZeros') || 'Append zeros',
+                        primary: true,
+                        onClick: () => {
+                            const paddedResult = this.onVectorInput?.(vectorText, { padZeros: true });
+                            if (paddedResult?.success) {
+                                vectorInputField.value = '';
+                                hideVectorNotification();
+                            } else if (paddedResult?.message) {
+                                showVectorNotification(paddedResult.message);
+                            }
+                        }
+                    },
+                    {
+                        label: window.i18n?.t('cancel') || 'Cancel',
+                        onClick: hideVectorNotification
+                    }
+                ]);
+                return;
+            }
+
+            if (result?.message) {
+                showVectorNotification(result.message);
             }
         };
 
@@ -222,6 +312,7 @@ export class UIController {
                     applyVector();
                 }
             });
+            vectorInputField.addEventListener('input', hideVectorNotification);
         }
 
         // MuJoCo simulation control buttons
@@ -605,4 +696,3 @@ export class UIController {
         return this.angleUnit;
     }
 }
-

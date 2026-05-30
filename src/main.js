@@ -8,6 +8,7 @@ import { SceneManager } from './renderer/SceneManager.js';
 import { UIController } from './ui/UIController.js';
 import { FileHandler } from './controllers/FileHandler.js';
 import { JointControlsUI } from './ui/JointControlsUI.js';
+import { GravityCompensationUI } from './ui/GravityCompensationUI.js';
 import { PanelManager } from './ui/PanelManager.js';
 import { ModelGraphView } from './views/ModelGraphView.js';
 import { FileTreeView } from './views/FileTreeView.js';
@@ -31,6 +32,7 @@ class App {
         this.uiController = null;
         this.fileHandler = null;
         this.jointControlsUI = null;
+        this.gravityUI = null;
         this.panelManager = null;
         this.modelGraphView = null;
         this.fileTreeView = null;
@@ -146,6 +148,11 @@ class App {
             // Initialize joint controls UI
             this.jointControlsUI = new JointControlsUI(this.sceneManager);
 
+            // Initialize gravity-compensation display (attached to sceneManager
+            // so UIController/onMeasurementUpdate can reach it)
+            this.gravityUI = new GravityCompensationUI(this.sceneManager);
+            this.sceneManager.gravityUI = this.gravityUI;
+
             // Initialize model graph view
             this.modelGraphView = new ModelGraphView(this.sceneManager);
 
@@ -178,7 +185,7 @@ class App {
                 onIgnoreLimitsChanged: (ignore) => this.handleIgnoreLimitsChanged(ignore),
                 onLanguageChanged: (lang) => this.handleLanguageChanged(lang),
                 onResetJoints: () => this.handleResetJoints(),
-                onVectorInput: (text) => this.handleVectorInput(text),
+                onVectorInput: (text, options) => this.handleVectorInput(text, options),
                 onMujocoReset: () => this.handleMujocoReset(),
                 onMujocoToggleSimulate: () => this.handleMujocoToggleSimulate()
             });
@@ -187,6 +194,11 @@ class App {
             this.sceneManager.onMeasurementUpdate = () => {
                 if (this.measurementController) {
                     this.measurementController.updateMeasurement();
+                }
+                // Gravity-compensation torques depend on the whole pose, so any
+                // joint change can change every joint's value -> recompute all.
+                if (this.gravityUI) {
+                    this.gravityUI.update();
                 }
             };
 
@@ -499,6 +511,11 @@ class App {
             // Normal model
             this.sceneManager.setGroundVisible(true);
             this.jointControlsUI.setupJointControls(model);
+
+            // Refresh gravity readouts for the newly built joint controls
+            if (this.gravityUI) {
+                this.gravityUI.update();
+            }
 
             // Draw model graph
             if (this.modelGraphView) {
@@ -942,9 +959,9 @@ class App {
     /**
      * Handle vector input for setting all joints
      */
-    handleVectorInput(text) {
+    handleVectorInput(text, options = {}) {
         if (this.currentModel && this.jointControlsUI) {
-            return this.jointControlsUI.setAllJoints(this.currentModel, text);
+            return this.jointControlsUI.setAllJoints(this.currentModel, text, options);
         }
         return { success: false };
     }

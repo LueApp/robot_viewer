@@ -22,6 +22,7 @@
  */
 import { XacroParser } from 'xacro-parser';
 import { URDFAdapter } from './URDFAdapter.js';
+import { resolveFileFromMap } from '../utils/FileUtils.js';
 
 export class XacroAdapter {
     /**
@@ -174,62 +175,7 @@ export class XacroAdapter {
                             }
                         }
 
-                        // Remove package:// prefix
-                        if (meshPath.startsWith('package://')) {
-                            meshPath = meshPath.replace(/^package:\/\//, '');
-                            const parts = meshPath.split('/');
-                            if (parts.length > 1) {
-                                meshPath = parts.slice(1).join('/');
-                            }
-                        }
-
-                        // Remove leading ./
-                        meshPath = meshPath.replace(/^\.\//, '');
-
-                        // Handle relative paths
-                        let normalizedPath = meshPath;
-                        if (meshPath.includes('../')) {
-                            const parts = meshPath.split('/');
-                            const resolvedParts = [];
-                            for (const part of parts) {
-                                if (part === '..') {
-                                    resolvedParts.pop();
-                                } else if (part !== '.' && part !== '') {
-                                    resolvedParts.push(part);
-                                }
-                            }
-                            normalizedPath = resolvedParts.join('/');
-                        }
-
-                        // Build full path
-                        const fullPath = urdfDir + normalizedPath;
-                        const altPath = urdfDir + meshPath;
-
-                        // Find file in fileMap
-                        let matchedFile = fileMap.get(fullPath);
-
-                        if (!matchedFile && altPath !== fullPath) {
-                            matchedFile = fileMap.get(altPath);
-                        }
-
-                        if (!matchedFile) {
-                            matchedFile = fileMap.get(normalizedPath);
-                        }
-
-                        if (!matchedFile) {
-                            matchedFile = fileMap.get(meshPath);
-                        }
-
-                        if (!matchedFile) {
-                            const targetFileName = normalizedPath.split('/').pop() || meshPath.split('/').pop();
-                            for (const [key, file] of fileMap.entries()) {
-                                const keyFileName = key.split('/').pop();
-                                if (keyFileName === targetFileName) {
-                                    matchedFile = file;
-                                    break;
-                                }
-                            }
-                        }
+                        const matchedFile = resolveFileFromMap(meshPath, fileMap, { baseDir: urdfDir });
 
                         if (matchedFile) {
                             const bloburl = URL.createObjectURL(matchedFile);
@@ -430,44 +376,7 @@ export class XacroAdapter {
      * @returns {Promise<File|null>}
      */
     static async findFileInMapByPath(path, fileMap, urdfDir) {
-        let meshPath = path;
-
-        // Remove blob: prefix
-        meshPath = meshPath.replace(/^blob:[^\/]+\//, '');
-
-        // Remove package:// prefix
-        if (meshPath.startsWith('package://')) {
-            meshPath = meshPath.replace(/^package:\/\//, '');
-            const parts = meshPath.split('/');
-            if (parts.length > 1) {
-                meshPath = parts.slice(1).join('/');
-            }
-        }
-
-        // Remove leading ./
-        meshPath = meshPath.replace(/^\.\//, '');
-
-        // Build full path
-        const fullPath = urdfDir + meshPath;
-
-        // Try full path
-        let file = fileMap.get(fullPath);
-        if (file) return file;
-
-        // Try path without directory
-        file = fileMap.get(meshPath);
-        if (file) return file;
-
-        // Try filename match
-        const targetFileName = meshPath.split('/').pop();
-        for (const [key, f] of fileMap.entries()) {
-            const keyFileName = key.split('/').pop();
-            if (keyFileName === targetFileName) {
-                return f;
-            }
-        }
-
-        return null;
+        return resolveFileFromMap(path, fileMap, { baseDir: urdfDir });
     }
 
     /**
@@ -610,5 +519,4 @@ export class XacroAdapter {
         return args;
     }
 }
-
 

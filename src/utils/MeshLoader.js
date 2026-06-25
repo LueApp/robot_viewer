@@ -3,6 +3,7 @@
  * Unified management of STL, OBJ, DAE, GLTF and other format loading
  */
 import * as THREE from 'three';
+import { normalizePath, resolveFileFromMap } from './FileUtils.js';
 
 // Cache loaders for performance
 let loadersCache = null;
@@ -37,14 +38,6 @@ async function getLoaders() {
 }
 
 /**
- * Normalize path
- */
-function normalizePath(path) {
-    if (!path) return '';
-    return path.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+/g, '/');
-}
-
-/**
  * Load single mesh file
  * @param {string} meshPath - Mesh file path
  * @param {Map} fileMap - File map
@@ -52,60 +45,16 @@ function normalizePath(path) {
  */
 export async function loadMeshFile(meshPath, fileMap) {
     try {
-        const normalizedPath = normalizePath(meshPath);
-        const fileNameOnly = normalizedPath.split('/').pop();
-        const baseName = fileNameOnly.split('.').slice(0, -1).join('.') || fileNameOnly;
-
-        let file = null;
-        let foundKey = null;
-
-        // Try multiple path formats to find file
-        const tryPaths = [
-            meshPath,
-            normalizedPath,
-            '/' + normalizedPath,
-            fileNameOnly,
-            baseName
-        ];
-
-        for (const tryPath of tryPaths) {
-            if (fileMap.has(tryPath)) {
-                file = fileMap.get(tryPath);
-                foundKey = tryPath;
-                break;
-            }
-        }
-
-        // Case-insensitive fuzzy matching
-        if (!file) {
-            const searchNameLower = fileNameOnly.toLowerCase();
-            const baseNameLower = baseName.toLowerCase();
-
-            for (const [key, value] of fileMap.entries()) {
-                const keyNormalized = normalizePath(key);
-                const keyLower = keyNormalized.toLowerCase();
-                const keyFileName = keyNormalized.split('/').pop().toLowerCase();
-                const keyBaseName = keyFileName.split('.').slice(0, -1).join('.') || keyFileName;
-
-                if (keyLower === searchNameLower ||
-                    keyFileName === searchNameLower ||
-                    keyBaseName === baseNameLower ||
-                    keyLower.endsWith('/' + searchNameLower)) {
-                    file = value;
-                    foundKey = key;
-                    break;
-                }
-            }
-        }
+        let file = resolveFileFromMap(meshPath, fileMap);
 
         // Try adding extensions
+        const normalizedPath = normalizePath(meshPath);
         if (!file && !normalizedPath.includes('.')) {
             const commonExts = ['.stl', '.obj', '.dae', '.gltf', '.glb'];
             for (const ext of commonExts) {
                 const pathWithExt = normalizedPath + ext;
-                if (fileMap.has(pathWithExt)) {
-                    file = fileMap.get(pathWithExt);
-                    foundKey = pathWithExt;
+                file = resolveFileFromMap(pathWithExt, fileMap);
+                if (file) {
                     break;
                 }
             }
@@ -297,4 +246,3 @@ export function ensureMeshHasPhongMaterial(meshObject) {
 }
 
 export { getLoaders };
-

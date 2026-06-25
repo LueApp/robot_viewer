@@ -1,6 +1,6 @@
 {
   "name": "robot-viewer",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Web-based robot model viewer supporting URDF, MJCF, and USD formats",
   "main": "index.html",
   "packageManager": "pnpm@9.0.0",

@@ -70,6 +70,8 @@ export const translations = {
         'projectHome': '项目主页',
         'email': '邮箱',
         'myGithub': '我的GitHub',
+        'creatorHome': 'Lue 的更多作品',
+        'personalWebsite': 'Lue 的个人网站',
         'operations': '操作指南',
         'leftDrag': '左键拖动',
         'rotateView': '旋转视角',
@@ -234,6 +236,8 @@ export const translations = {
         'projectHome': 'Project Home',
         'email': 'Email',
         'myGithub': 'My GitHub',
+        'creatorHome': 'More by Lue',
+        'personalWebsite': "Lue's Website",
         'operations': 'Operations',
         'leftDrag': 'Left Drag',
         'rotateView': 'Rotate View',
@@ -393,4 +397,3 @@ class I18n {
 
 // 创建全局实例
 export const i18n = new I18n();
-

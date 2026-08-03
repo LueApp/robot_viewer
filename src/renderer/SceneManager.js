@@ -490,6 +490,15 @@ export class SceneManager {
     }
 
     /**
+     * Get the world wrapper object's quaternion (used for coordinate system conversion).
+     * Returns null if no world wrapper exists (e.g., single-mesh models).
+     */
+    getWorldWrapperQuaternion() {
+        if (!this.world) return null;
+        return this.world.quaternion.clone();
+    }
+
+    /**
      * Set ground visibility
      */
     setGroundVisible(visible) {

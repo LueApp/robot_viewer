@@ -509,6 +509,16 @@ export class SceneManager {
     }
 
     /**
+     * Set ground grid visibility
+     */
+    setGridVisible(visible) {
+        if (this.referenceGrid) {
+            this.referenceGrid.visible = visible;
+            this.redraw();
+        }
+    }
+
+    /**
      * Focus object (center camera on object)
      */
     focusObject(object) {

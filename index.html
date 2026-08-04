@@ -2589,6 +2589,27 @@
             border-color: rgba(0, 0, 0, 0.12);
         }
 
+        /* Translation joints: subtle amber accent (rotation joints keep default style) */
+        .joint-control--prismatic {
+            background: rgba(251, 191, 36, 0.08);
+            border-color: rgba(251, 191, 36, 0.25);
+        }
+
+        .joint-control--prismatic:hover {
+            background: rgba(251, 191, 36, 0.12);
+            border-color: rgba(251, 191, 36, 0.35);
+        }
+
+        [data-theme="light"] .joint-control--prismatic {
+            background: rgba(217, 119, 6, 0.08);
+            border-color: rgba(217, 119, 6, 0.25);
+        }
+
+        [data-theme="light"] .joint-control--prismatic:hover {
+            background: rgba(217, 119, 6, 0.12);
+            border-color: rgba(217, 119, 6, 0.35);
+        }
+
         .joint-header {
             display: flex;
             justify-content: space-between;
@@ -3582,7 +3603,19 @@
             pointer-events: none;
             user-select: none;
             opacity: 0.8;
-            transition: opacity 0.3s ease;
+            transition: bottom 0.3s var(--spring), opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        body.animation-editor-open #bottom-help-bar {
+            bottom: -48px;
+            z-index: 1;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        body.animation-editor-open #copyright-watermark {
+            opacity: 0;
+            visibility: hidden;
         }
 
         #bottom-help-bar:hover {
@@ -3649,6 +3682,9 @@
                     <button class="control-button active" id="toggle-lighting" data-checked="true">
                         <span data-i18n="lighting"></span>
                     </button>
+                    <button class="control-button active" id="toggle-grid" data-checked="true">
+                        <span data-i18n="grid"></span>
+                    </button>
                 </div>
 
                 <div class="control-bar-divider"></div>
@@ -3680,6 +3716,9 @@
                     </button>
                     <button class="tool-button active" id="toggle-joints-panel">
                         <span class="tool-button-text" data-i18n="joints"></span>
+                    </button>
+                    <button class="tool-button" id="toggle-animation-panel">
+                        <span class="tool-button-text" data-i18n="animation"></span>
                     </button>
                     <button class="tool-button" id="toggle-model-tree">
                         <span class="tool-button-text" data-i18n="structure"></span>

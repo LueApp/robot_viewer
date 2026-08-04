@@ -12,6 +12,27 @@ export class JointControlsUI {
         this.initialJointValues = new Map(); // Save initial joint positions when model loads
         this.codeEditorManager = null; // Code editor manager reference
         this.isUpdatingFromEditor = false; // Flag to prevent circular updates
+        this.poseController = null;
+        this.unsubscribePose = null;
+    }
+
+    setPoseController(poseController) {
+        this.unsubscribePose?.();
+        this.poseController = poseController;
+        this.unsubscribePose = poseController?.subscribe((event) => {
+            if (event.type === 'jointChanged') {
+                this.updateJointDisplay(event.jointName, event.value);
+            }
+        });
+    }
+
+    updateJointDisplay(jointName, value) {
+        const slider = Array.from(document.querySelectorAll('input[data-joint]'))
+            .find((input) => input.dataset.joint === jointName);
+        if (!slider) return;
+        slider.value = value;
+        const control = slider.closest('.joint-control');
+        control?._updateDisplay?.();
     }
 
     /**
@@ -19,6 +40,57 @@ export class JointControlsUI {
      */
     setCodeEditorManager(codeEditorManager) {
         this.codeEditorManager = codeEditorManager;
+    }
+
+    /**
+     * Whether the joint moves along an axis (translation) instead of rotating.
+     * URDF "prismatic" and MJCF "slide" joints are both normalized to 'prismatic'.
+     */
+    isTranslational(joint) {
+        return joint && joint.type === 'prismatic';
+    }
+
+    /**
+     * Display unit for a joint, depending on its type and the current unit toggle.
+     * Translation: m / mm. Rotation: rad / °.
+     */
+    getJointUnit(joint) {
+        if (this.isTranslational(joint)) {
+            return this.angleUnit === 'deg' ? 'mm' : 'm';
+        }
+        return this.angleUnit === 'deg' ? '°' : 'rad';
+    }
+
+    /**
+     * Number of decimals used when displaying a joint value.
+     */
+    getDisplayDecimals(joint) {
+        if (this.isTranslational(joint)) {
+            return this.angleUnit === 'deg' ? 1 : 3; // mm : m
+        }
+        return this.angleUnit === 'deg' ? 1 : 2; // ° : rad
+    }
+
+    /**
+     * Convert an internal joint value (radians for rotation, meters for
+     * translation) to the currently displayed unit.
+     */
+    toDisplayValue(joint, baseValue) {
+        if (this.isTranslational(joint)) {
+            return this.angleUnit === 'deg' ? baseValue * 1000 : baseValue; // m -> mm
+        }
+        return this.angleUnit === 'deg' ? baseValue * 180 / Math.PI : baseValue; // rad -> deg
+    }
+
+    /**
+     * Convert a value entered in the displayed unit back to the internal value
+     * (radians for rotation, meters for translation).
+     */
+    fromDisplayValue(joint, displayValue) {
+        if (this.isTranslational(joint)) {
+            return this.angleUnit === 'deg' ? displayValue / 1000 : displayValue; // mm -> m
+        }
+        return this.angleUnit === 'deg' ? displayValue * Math.PI / 180 : displayValue; // deg -> rad
     }
 
     /**
@@ -143,6 +215,10 @@ export class JointControlsUI {
     createJointControl(joint, model) {
         const div = document.createElement('div');
         div.className = 'joint-control';
+        // Tint only translation joints differently; rotation joints keep the default style
+        if (this.isTranslational(joint)) {
+            div.classList.add('joint-control--prismatic');
+        }
 
         // First row: name + value
         const header = document.createElement('div');
@@ -174,10 +250,10 @@ export class JointControlsUI {
         slider.setAttribute('data-joint', joint.name);
         slider.min = lower;
         slider.max = upper;
+        slider.step = (upper - lower) / 1000;
 
         let initialValue = joint.currentValue !== undefined ? joint.currentValue : (lower + upper) / 2;
         slider.value = initialValue;
-        slider.step = (upper - lower) / 1000;
 
         // Editable lower limit label
         const minLabel = document.createElement('input');
@@ -202,26 +278,19 @@ export class JointControlsUI {
 
         const valueUnit = document.createElement('span');
         valueUnit.className = 'joint-value-unit';
-        valueUnit.textContent = this.angleUnit === 'deg' ? '°' : 'rad';
+        valueUnit.textContent = this.getJointUnit(joint);
 
         const updateLabels = () => {
             const currentMin = parseFloat(slider.min);
             const currentMax = parseFloat(slider.max);
-
-            if (this.angleUnit === 'deg') {
-                minLabel.value = (currentMin * 180 / Math.PI).toFixed(1);
-                maxLabel.value = (currentMax * 180 / Math.PI).toFixed(1);
-            } else {
-                minLabel.value = currentMin.toFixed(2);
-                maxLabel.value = currentMax.toFixed(2);
-            }
+            const decimals = this.getDisplayDecimals(joint);
+            minLabel.value = this.toDisplayValue(joint, currentMin).toFixed(decimals);
+            maxLabel.value = this.toDisplayValue(joint, currentMax).toFixed(decimals);
         };
 
         const updateValueInput = () => {
             const value = parseFloat(slider.value);
-            valueInput.value = this.angleUnit === 'deg' ?
-                (value * 180 / Math.PI).toFixed(1) :
-                value.toFixed(2);
+            valueInput.value = this.toDisplayValue(joint, value).toFixed(this.getDisplayDecimals(joint));
         };
 
         updateLabels();
@@ -235,9 +304,7 @@ export class JointControlsUI {
                 return;
             }
 
-            let valueInRad = this.angleUnit === 'deg' ?
-                inputValue * Math.PI / 180 :
-                inputValue;
+            let valueInRad = this.fromDisplayValue(joint, inputValue);
 
             const currentMax = parseFloat(slider.max);
             if (valueInRad >= currentMax) {
@@ -260,8 +327,15 @@ export class JointControlsUI {
             const currentValue = parseFloat(slider.value);
             if (currentValue < valueInRad) {
                 slider.value = valueInRad;
-                ModelLoaderFactory.setJointAngle(model, joint.name, valueInRad);
-                joint.currentValue = valueInRad;
+                if (this.poseController) {
+                    this.poseController.setJointValue(joint.name, valueInRad, {
+                        source: 'limits',
+                        commit: false
+                    });
+                } else {
+                    ModelLoaderFactory.setJointAngle(model, joint.name, valueInRad);
+                    joint.currentValue = valueInRad;
+                }
                 updateValueInput();
                 this.sceneManager.redraw();
                 this.sceneManager.render();
@@ -283,9 +357,7 @@ export class JointControlsUI {
                 return;
             }
 
-            let valueInRad = this.angleUnit === 'deg' ?
-                inputValue * Math.PI / 180 :
-                inputValue;
+            let valueInRad = this.fromDisplayValue(joint, inputValue);
 
             const currentMin = parseFloat(slider.min);
             if (valueInRad <= currentMin) {
@@ -308,8 +380,15 @@ export class JointControlsUI {
             const currentValue = parseFloat(slider.value);
             if (currentValue > valueInRad) {
                 slider.value = valueInRad;
-                ModelLoaderFactory.setJointAngle(model, joint.name, valueInRad);
-                joint.currentValue = valueInRad;
+                if (this.poseController) {
+                    this.poseController.setJointValue(joint.name, valueInRad, {
+                        source: 'limits',
+                        commit: false
+                    });
+                } else {
+                    ModelLoaderFactory.setJointAngle(model, joint.name, valueInRad);
+                    joint.currentValue = valueInRad;
+                }
                 updateValueInput();
                 this.sceneManager.redraw();
                 this.sceneManager.render();
@@ -491,12 +570,19 @@ export class JointControlsUI {
 
         slider.addEventListener('input', () => {
             const value = parseFloat(slider.value);
-            ModelLoaderFactory.setJointAngle(model, joint.name, value);
-            joint.currentValue = value;
+            if (this.poseController) {
+                this.poseController.setJointValue(joint.name, value, {
+                    source: 'user',
+                    commit: false
+                });
+            } else {
+                ModelLoaderFactory.setJointAngle(model, joint.name, value);
+                joint.currentValue = value;
+            }
             updateValueInput();
 
             // Apply parallel mechanism constraints
-            if (this.sceneManager.constraintManager) {
+            if (!this.poseController && this.sceneManager.constraintManager) {
                 this.sceneManager.constraintManager.applyConstraints(model, joint);
             }
 
@@ -516,6 +602,10 @@ export class JointControlsUI {
             }
         });
 
+        slider.addEventListener('change', () => {
+            this.poseController?.commitJointValue(joint.name, { source: 'user' });
+        });
+
         // Manual input event
         valueInput.addEventListener('change', () => {
             let inputValue = parseFloat(valueInput.value);
@@ -524,20 +614,25 @@ export class JointControlsUI {
                 return;
             }
 
-            let valueInRad = this.angleUnit === 'deg' ?
-                inputValue * Math.PI / 180 :
-                inputValue;
+            let valueInRad = this.fromDisplayValue(joint, inputValue);
 
             const currentMin = parseFloat(slider.min);
             const currentMax = parseFloat(slider.max);
             valueInRad = Math.max(currentMin, Math.min(currentMax, valueInRad));
 
             slider.value = valueInRad;
-            ModelLoaderFactory.setJointAngle(model, joint.name, valueInRad);
-            joint.currentValue = valueInRad;
+            if (this.poseController) {
+                this.poseController.setJointValue(joint.name, valueInRad, {
+                    source: 'user',
+                    commit: true
+                });
+            } else {
+                ModelLoaderFactory.setJointAngle(model, joint.name, valueInRad);
+                joint.currentValue = valueInRad;
+            }
 
             // Apply parallel mechanism constraints
-            if (this.sceneManager.constraintManager) {
+            if (!this.poseController && this.sceneManager.constraintManager) {
                 this.sceneManager.constraintManager.applyConstraints(model, joint);
             }
 
@@ -555,7 +650,7 @@ export class JointControlsUI {
         div._updateDisplay = () => {
             updateValueInput();
             updateLabels();
-            valueUnit.textContent = this.angleUnit === 'deg' ? '°' : 'rad';
+            valueUnit.textContent = this.getJointUnit(joint);
         };
 
         return div;
@@ -593,9 +688,18 @@ export class JointControlsUI {
                 }
 
                 // Set joint angle, ignore limit constraints because initial position may exceed current limits
-                ModelLoaderFactory.setJointAngle(model, name, initialValue, true);
-
-                joint.currentValue = initialValue;
+                if (this.poseController) {
+                    this.poseController.setJointValue(name, initialValue, {
+                        source: 'reset',
+                        commit: false,
+                        ignoreLimits: true,
+                        render: false,
+                        measure: false
+                    });
+                } else {
+                    ModelLoaderFactory.setJointAngle(model, name, initialValue, true);
+                    joint.currentValue = initialValue;
+                }
 
                 const slider = document.querySelector(`input[data-joint="${name}"]`);
                 if (slider) {

@@ -667,6 +667,26 @@ export class UIController {
     }
 
     /**
+     * Setup ground grid toggle button
+     */
+    setupGridToggle() {
+        const gridBtn = document.getElementById('toggle-grid');
+        if (!gridBtn) {
+            return;
+        }
+
+        gridBtn.addEventListener('click', () => {
+            const isChecked = gridBtn.getAttribute('data-checked') === 'true';
+            const newState = !isChecked;
+
+            gridBtn.setAttribute('data-checked', newState.toString());
+            gridBtn.classList.toggle('active', newState);
+            this.sceneManager.setGridVisible(newState);
+            this.sceneManager.render();
+        });
+    }
+
+    /**
      * Setup all buttons and panels
      */
     setupAll(callbacks = {}) {
@@ -687,6 +707,7 @@ export class UIController {
         this.setupShadowToggle();
         this.setupLightingToggle();
         this.setupCopiedFramesPanelToggle();
+        this.setupGridToggle();
     }
 
     /**

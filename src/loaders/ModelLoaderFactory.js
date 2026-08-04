@@ -7,6 +7,7 @@ import { URDFAdapter } from '../adapters/URDFAdapter.js';
 import { MJCFAdapter } from '../adapters/MJCFAdapter.js';
 import { USDAdapter } from '../adapters/USDAdapter.js';
 import { XacroAdapter } from '../adapters/XacroAdapter.js';
+import { resolveFileFromMap } from '../utils/FileUtils.js';
 
 export class ModelLoaderFactory {
     /**
@@ -219,59 +220,7 @@ export class ModelLoaderFactory {
                         }
                     }
 
-                    // Remove package:// prefix
-                    if (meshPath.startsWith('package://')) {
-                        meshPath = meshPath.replace(/^package:\/\//, '');
-                        // Package path, remove package name
-                        const parts = meshPath.split('/');
-                        if (parts.length > 1) {
-                            meshPath = parts.slice(1).join('/'); // Remove package name
-                        }
-                    }
-
-                    // Remove leading ./
-                    meshPath = meshPath.replace(/^\.\//, '');
-
-                    // Handle relative paths (e.g., ../meshes/xxx.jpg)
-                    // Normalize path by resolving ../
-                    let normalizedPath = this.normalizeRelativePath(meshPath);
-
-                    // Build full path based on URDF file location
-                    // If URDF is at "e3_v2/e3.urdf", mesh path is "meshes/file.stl"
-                    // Then full path should be "e3_v2/meshes/file.stl"
-                    // Also try with normalized path for relative paths
-                    const fullPath = this.normalizeRelativePath(urdfDir + meshPath);
-                    const altPath = urdfDir + meshPath;
-
-                    // Find file in fileMap - try multiple path variations
-                    let matchedFile = fileMap.get(fullPath);
-
-                    if (!matchedFile && altPath !== fullPath) {
-                        // Try alternative path (with original relative path)
-                        matchedFile = fileMap.get(altPath);
-                    }
-
-                    if (!matchedFile) {
-                        // Try normalized path without directory prefix
-                        matchedFile = fileMap.get(normalizedPath);
-                    }
-
-                    if (!matchedFile) {
-                        // Try path without directory prefix (original)
-                        matchedFile = fileMap.get(meshPath);
-                    }
-
-                    if (!matchedFile) {
-                        // Try filename only match
-                        const targetFileName = normalizedPath.split('/').pop() || meshPath.split('/').pop();
-                        for (const [key, file] of fileMap.entries()) {
-                            const keyFileName = key.split('/').pop();
-                            if (keyFileName === targetFileName) {
-                                matchedFile = file;
-                                break;
-                            }
-                        }
-                    }
+                    const matchedFile = resolveFileFromMap(meshPath, fileMap, { baseDir: urdfDir });
 
                     if (matchedFile) {
                         // Create Blob URL (don't revoke immediately, let loader finish using it)
@@ -517,71 +466,7 @@ export class ModelLoaderFactory {
      * @returns {Promise<File|null>}
      */
     static async findFileInMapByPath(path, fileMap, urdfDir) {
-        // Clean path
-        let meshPath = path;
-
-        // Remove blob: prefix (if present)
-        meshPath = meshPath.replace(/^blob:[^\/]+\//, '');
-
-        // Remove package:// prefix
-        if (meshPath.startsWith('package://')) {
-            meshPath = meshPath.replace(/^package:\/\//, '');
-            // Package path, remove package name
-            const parts = meshPath.split('/');
-            if (parts.length > 1) {
-                meshPath = parts.slice(1).join('/'); // Remove package name
-            }
-        }
-
-        // Remove leading ./
-        meshPath = meshPath.replace(/^\.\//, '');
-
-        const normalizedPath = this.normalizeRelativePath(meshPath);
-        const normalizedFullPath = this.normalizeRelativePath(urdfDir + meshPath);
-
-        const exactPaths = [
-            normalizedFullPath,
-            urdfDir + meshPath,
-            normalizedPath,
-            meshPath
-        ];
-
-        for (const exactPath of exactPaths) {
-            const file = fileMap.get(exactPath);
-            if (file) {
-                return file;
-            }
-        }
-
-        for (const [key, file] of fileMap.entries()) {
-            const normalizedKey = this.normalizeRelativePath(key);
-            if (exactPaths.includes(normalizedKey)) {
-                return file;
-            }
-        }
-
-        // Strategy 3: Filename match. Prefer files whose normalized path contains
-        // the requested directory segment, so visual meshes do not resolve to
-        // same-named collision meshes.
-        const targetFileName = meshPath.split('/').pop();
-        const requestedDir = normalizedPath.includes('/')
-            ? normalizedPath.substring(0, normalizedPath.lastIndexOf('/') + 1)
-            : '';
-        let filenameOnlyMatch = null;
-        for (const [key, f] of fileMap.entries()) {
-            const normalizedKey = this.normalizeRelativePath(key);
-            const keyFileName = normalizedKey.split('/').pop();
-            if (keyFileName === targetFileName) {
-                if (requestedDir && normalizedKey.includes(requestedDir)) {
-                    return f;
-                }
-                if (!filenameOnlyMatch) {
-                    filenameOnlyMatch = f;
-                }
-            }
-        }
-
-        return filenameOnlyMatch;
+        return resolveFileFromMap(path, fileMap, { baseDir: urdfDir });
     }
 
     /**

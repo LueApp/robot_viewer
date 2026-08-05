@@ -17,6 +17,7 @@ export class CodeEditorManager {
         };
         this.onReload = null; // Reload callback
         this.fileMap = null; // File map reference
+        this.contentChangeListeners = new Set();
     }
 
     /**
@@ -36,6 +37,7 @@ export class CodeEditorManager {
         this.codeEditorInstance.onChange((content) => {
             this.editorState.currentContent = content;
             this.updateEditorSaveStatus();
+            this.contentChangeListeners.forEach(listener => listener(content));
         });
 
         this.setupEditorControls();
@@ -151,99 +153,7 @@ export class CodeEditorManager {
 
         // Reload - reload model using current editor content (without saving)
         if (reloadBtn) {
-            reloadBtn.addEventListener('click', async () => {
-                try {
-                    // Get current editor content
-                    const newContent = this.codeEditorInstance.getValue();
-
-                    // Check if content is empty
-                    if (!newContent || newContent.trim().length === 0) {
-                        return;
-                    }
-
-                    // Determine filename and type
-                    let fileName, fileType;
-                    if (this.editorState.currentFile) {
-                        // If file is open, use its filename
-                        fileName = this.editorState.currentFile.name;
-                        fileType = this.editorState.currentFile.type;
-                    } else {
-                        // If no file, get filename from input, infer type from extension
-                        const filenameInput = document.getElementById('editor-filename-input');
-
-                        if (filenameInput) {
-                            fileName = filenameInput.value.trim() || this.editorState.defaultFileName;
-                        } else {
-                            fileName = this.editorState.defaultFileName;
-                        }
-
-                        // Infer type from filename extension
-                        fileType = this.detectFileTypeFromName(fileName);
-                    }
-
-                    // Create temporary file
-                    const blob = new Blob([newContent], { type: 'text/plain' });
-                    const newFile = new File([blob], fileName, {
-                        type: fileType
-                    });
-
-                    // If has current file, update file map (temporary)
-                    if (this.editorState.currentFile) {
-                        // Collect keys to update
-                        const keysToUpdate = [];
-                        for (const [key] of this.fileMap.entries()) {
-                            if (key.endsWith(fileName) || key === fileName) {
-                                keysToUpdate.push(key);
-                            }
-                        }
-
-                        // Only update existing keys (don't add new keys)
-                        keysToUpdate.forEach(key => {
-                            this.fileMap.set(key, newFile);
-                        });
-                    } else {
-                        // If new file, add to fileMap
-                        this.fileMap.set(fileName, newFile);
-                    }
-
-                    // Save current editor content to prevent being overwritten by loadFile
-                    const savedEditorContent = newContent;
-
-                    // Temporarily disable editor auto-loading in loadFile
-                    this._reloadingInProgress = true;
-
-                    // Call reload callback (pass flag indicating this is a reload)
-                    if (this.onReload) {
-                        await this.onReload(newFile, true); // true means this is a reload
-                    }
-
-                    // Don't modify editor content on reload to avoid focus loss
-                    // Content is already user-edited content, no need to reset
-                    this.editorState.currentContent = savedEditorContent;
-
-                    // If loaded from blank state, update currentFile
-                    if (!this.editorState.currentFile) {
-                        this.editorState.currentFile = newFile;
-                        const filenameEl = document.getElementById('editor-filename');
-                        if (filenameEl) {
-                            filenameEl.textContent = fileName;
-                        }
-                        // Update control visibility
-                        if (this.updateControlsVisibility) {
-                            this.updateControlsVisibility();
-                        }
-                    }
-
-                    // Note: Don't update originalContent, keep original content unchanged
-                    // This allows user to continue editing, still showing "unsaved" state
-
-                    this._reloadingInProgress = false;
-
-                } catch (error) {
-                    this._reloadingInProgress = false;
-                    console.error(`${window.i18n.t('reloadFailed')}: ${error.message}`);
-                }
-            });
+            reloadBtn.addEventListener('click', () => this.reloadFromEditor());
         }
 
         // Download button - directly download current content
@@ -259,6 +169,68 @@ export class CodeEditorManager {
             });
         }
 
+    }
+
+    /**
+     * Reload the preview from the current editor content without downloading it.
+     * This is also used by structured URDF editing tools.
+     * @returns {Promise<boolean>} Whether a reload was performed successfully
+     */
+    async reloadFromEditor() {
+        if (this._reloadingInProgress || !this.codeEditorInstance) return false;
+
+        try {
+            const newContent = this.codeEditorInstance.getValue();
+            if (!newContent || newContent.trim().length === 0) return false;
+
+            let fileName;
+            let fileType;
+            if (this.editorState.currentFile) {
+                fileName = this.editorState.currentFile.name;
+                fileType = this.editorState.currentFile.type;
+            } else {
+                const filenameInput = document.getElementById('editor-filename-input');
+                fileName = filenameInput?.value.trim() || this.editorState.defaultFileName;
+                fileType = this.detectFileTypeFromName(fileName);
+            }
+
+            const blob = new Blob([newContent], { type: 'text/plain' });
+            const newFile = new File([blob], fileName, { type: fileType });
+
+            if (this.editorState.currentFile) {
+                const keysToUpdate = [];
+                for (const [key] of this.fileMap.entries()) {
+                    if (key.endsWith(fileName) || key === fileName) keysToUpdate.push(key);
+                }
+                keysToUpdate.forEach(key => this.fileMap.set(key, newFile));
+            } else {
+                this.fileMap.set(fileName, newFile);
+            }
+
+            const hadCurrentFile = Boolean(this.editorState.currentFile);
+            this._reloadingInProgress = true;
+            if (this.onReload) await this.onReload(newFile, true);
+            this.editorState.currentContent = newContent;
+
+            if (!hadCurrentFile) {
+                this.editorState.currentFile = newFile;
+                const filenameEl = document.getElementById('editor-filename');
+                if (filenameEl) filenameEl.textContent = fileName;
+                this.updateControlsVisibility?.();
+            }
+
+            return true;
+        } catch (error) {
+            console.error(`${window.i18n.t('reloadFailed')}: ${error.message}`);
+            return false;
+        } finally {
+            this._reloadingInProgress = false;
+        }
+    }
+
+    subscribeToContentChanges(listener) {
+        this.contentChangeListeners.add(listener);
+        return () => this.contentChangeListeners.delete(listener);
     }
 
     /**
@@ -550,4 +522,3 @@ export class CodeEditorManager {
         return found;
     }
 }
-

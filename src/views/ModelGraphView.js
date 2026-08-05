@@ -9,6 +9,7 @@ export class ModelGraphView {
         this.sceneManager = sceneManager;
         this.measurementController = measurementController;
         this.codeEditorManager = null; // Code editor manager reference
+        this.urdfTransformEditor = null;
         this.currentZoom = null; // Save current zoom behavior
         this.currentSvg = null; // Save current SVG selector
         this.currentContainer = null; // Save current container
@@ -283,6 +284,7 @@ export class ModelGraphView {
                 if (this.codeEditorManager && d.target.data.jointName) {
                     this.codeEditorManager.scrollToJoint(d.target.data.jointName);
                 }
+                this.urdfTransformEditor?.selectJoint(d.target.data.jointName);
             }
         });
 
@@ -394,6 +396,7 @@ export class ModelGraphView {
                 if (this.codeEditorManager && d.data.name) {
                     this.codeEditorManager.scrollToLink(d.data.name);
                 }
+                this.urdfTransformEditor?.selectLink(d.data.name);
             }
         });
 
@@ -642,6 +645,13 @@ export class ModelGraphView {
                         item.classList.add('disabled');
                     }
                     break;
+                case 'edit-urdf-transform':
+                    if (this.urdfTransformEditor?.isSupported) {
+                        item.classList.remove('disabled');
+                    } else {
+                        item.classList.add('disabled');
+                    }
+                    break;
             }
 
             if (check) {
@@ -768,6 +778,10 @@ export class ModelGraphView {
                 }
                 case 'copy-joint-axis': {
                     this.sceneManager.copiedFrameManager.copyJointAxis(linkName, model);
+                    break;
+                }
+                case 'edit-urdf-transform': {
+                    this.urdfTransformEditor?.selectLink(linkName, true);
                     break;
                 }
             }
@@ -949,6 +963,10 @@ export class ModelGraphView {
         this.codeEditorManager = manager;
     }
 
+    setURDFTransformEditor(editor) {
+        this.urdfTransformEditor = editor;
+    }
+
     /**
      * Auto-fit view to fill container
      * @param {boolean} animated - Whether to use animation
@@ -1006,4 +1024,3 @@ export class ModelGraphView {
         }
     }
 }
-

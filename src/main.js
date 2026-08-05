@@ -8,6 +8,7 @@ import { SceneManager } from './renderer/SceneManager.js';
 import { UIController } from './ui/UIController.js';
 import { FileHandler } from './controllers/FileHandler.js';
 import { JointControlsUI } from './ui/JointControlsUI.js';
+import { URDFTransformEditor } from './ui/URDFTransformEditor.js';
 import { GravityCompensationUI } from './ui/GravityCompensationUI.js';
 import { PanelManager } from './ui/PanelManager.js';
 import { ModelGraphView } from './views/ModelGraphView.js';
@@ -34,6 +35,7 @@ class App {
         this.uiController = null;
         this.fileHandler = null;
         this.jointControlsUI = null;
+        this.urdfTransformEditor = null;
         this.gravityUI = null;
         this.panelManager = null;
         this.modelGraphView = null;
@@ -226,6 +228,8 @@ class App {
             this.codeEditorManager = new CodeEditorManager();
             this.codeEditorManager.init(this.fileHandler.getFileMap());
 
+            this.urdfTransformEditor = new URDFTransformEditor(this.codeEditorManager);
+
             // Set code editor manager to joint controls UI
             if (this.jointControlsUI) {
                 this.jointControlsUI.setCodeEditorManager(this.codeEditorManager);
@@ -234,6 +238,7 @@ class App {
             // Set code editor manager to model graph view
             if (this.modelGraphView) {
                 this.modelGraphView.setCodeEditorManager(this.codeEditorManager);
+                this.modelGraphView.setURDFTransformEditor(this.urdfTransformEditor);
             }
 
             this.codeEditorManager.onReload = async (file, skipTreeUpdate = false) => {
@@ -320,6 +325,8 @@ class App {
      * Handle model loaded
      */
     async handleModelLoaded(model, file, isMesh = false, snapshot = null) {
+        this.urdfTransformEditor?.setModel(model, file);
+
         // Check if MJCF file (show simulation controls, don't auto-start simulation)
         const fileExt = file.name.split('.').pop().toLowerCase();
         const isMJCF = fileExt === 'xml' && model?.userData?.type === 'mjcf';
@@ -1013,6 +1020,7 @@ class App {
         if (this.currentModel && this.modelGraphView) {
             this.modelGraphView.drawModelGraph(this.currentModel);
         }
+        this.urdfTransformEditor?.refreshFromEditor();
 
         // Update file tree view (preserve expanded state)
         if (this.fileTreeView && this.fileHandler) {

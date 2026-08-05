@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<robot name="urdf_transform_demo">
+  <material name="base_blue">
+    <color rgba="0.12 0.35 0.75 1"/>
+  </material>
+  <material name="arm_orange">
+    <color rgba="0.95 0.42 0.12 1"/>
+  </material>
+  <material name="tool_green">
+    <color rgba="0.18 0.72 0.42 1"/>
+  </material>
+  <material name="marker_yellow">
+    <color rgba="1 0.82 0.12 1"/>
+  </material>
+
+  <link name="base_link">
+    <visual name="base_visual">
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.65 0.48 0.12"/>
+      </geometry>
+      <material name="base_blue"/>
+    </visual>
+    <collision name="base_collision">
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.65 0.48 0.12"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="arm_link">
+    <visual name="arm_mesh">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/demo-arm.obj" scale="1 1 1"/>
+      </geometry>
+      <material name="arm_orange"/>
+    </visual>
+    <visual name="arm_tip_marker">
+      <origin xyz="0 0 0.72" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.085"/>
+      </geometry>
+      <material name="marker_yellow"/>
+    </visual>
+    <collision name="arm_collision">
+      <origin xyz="0 0 0.36" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.15 0.15 0.72"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="shoulder_joint" type="revolute">
+    <origin xyz="0 0 0.12" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="arm_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="2"/>
+  </joint>
+
+  <link name="tool_link">
+    <visual name="tool_mesh">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/demo-tool.obj" scale="1 1 1"/>
+      </geometry>
+      <material name="tool_green"/>
+    </visual>
+    <collision name="tool_collision">
+      <origin xyz="0.18 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.36 0.22 0.12"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="tool_slide_joint" type="prismatic">
+    <origin xyz="0 0 0.72" rpy="0 0 0"/>
+    <parent link="arm_link"/>
+    <child link="tool_link"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="0" upper="0.35" effort="15" velocity="0.5"/>
+  </joint>
+</robot>

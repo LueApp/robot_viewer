@@ -262,6 +262,7 @@ export class PanelManager {
         this.registerPanel('floating-joints-panel');
         this.registerPanel('floating-gravity-panel');
         this.registerPanel('floating-model-tree');
+        this.registerPanel('floating-urdf-transform-panel');
         this.registerPanel('floating-help-panel');
         this.registerPanel('code-editor-panel', '.code-editor-header');
 
@@ -390,4 +391,3 @@ export class PanelManager {
         }
     }
 }
-

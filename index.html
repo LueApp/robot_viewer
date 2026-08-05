@@ -1793,6 +1793,161 @@
             height: calc(100vh - 100px) !important;
         }
 
+        /* Structured URDF transform editor */
+        #floating-urdf-transform-panel {
+            top: 80px;
+            left: calc(50vw - 190px);
+            width: 380px;
+            height: min(680px, calc(100vh - 100px));
+            display: none;
+            flex-direction: column;
+            transition: all 0.4s var(--spring);
+        }
+
+        #floating-urdf-transform-panel.maximized {
+            top: 80px !important;
+            left: 20px !important;
+            width: calc(100vw - 40px) !important;
+            height: calc(100vh - 100px) !important;
+        }
+
+        .urdf-transform-hint {
+            margin: 0 0 12px;
+            color: var(--text-tertiary);
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .urdf-transform-section {
+            margin-bottom: 12px;
+            padding: 12px;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.025);
+        }
+
+        [data-theme="light"] .urdf-transform-section {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .urdf-transform-section h3 {
+            margin: 0 0 10px;
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .urdf-transform-field {
+            display: block;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        .urdf-transform-field > span {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .urdf-transform-field select,
+        .urdf-vector-inputs input {
+            box-sizing: border-box;
+            border: 1px solid var(--glass-border);
+            border-radius: 7px;
+            outline: none;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-primary);
+            font: inherit;
+        }
+
+        .urdf-transform-field select {
+            width: 100%;
+            padding: 7px 8px;
+        }
+
+        .urdf-vector-inputs {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        .urdf-vector-inputs label {
+            display: grid;
+            grid-template-columns: 16px minmax(0, 1fr);
+            align-items: center;
+            gap: 3px;
+            font-weight: 600;
+        }
+
+        .urdf-vector-inputs label:nth-child(1) { color: #ff6666; }
+        .urdf-vector-inputs label:nth-child(2) { color: #66cc66; }
+        .urdf-vector-inputs label:nth-child(3) { color: #6688ff; }
+
+        .urdf-vector-inputs input {
+            width: 100%;
+            min-width: 0;
+            padding: 7px 5px;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .urdf-transform-field select:focus,
+        .urdf-vector-inputs input:focus {
+            border-color: var(--accent);
+        }
+
+        .urdf-transform-fieldset {
+            min-width: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+        }
+
+        .urdf-transform-fieldset:disabled {
+            opacity: 0.45;
+        }
+
+        .urdf-transform-apply {
+            width: 100%;
+            padding: 8px 12px;
+            border: 0;
+            border-radius: 8px;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .urdf-transform-apply:hover:not(:disabled) {
+            filter: brightness(1.08);
+        }
+
+        .urdf-transform-apply:disabled {
+            cursor: default;
+            opacity: 0.45;
+        }
+
+        #urdf-transform-status {
+            margin-top: 4px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(74, 158, 255, 0.12);
+            color: var(--text-secondary);
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        #urdf-transform-status[data-type="success"] {
+            background: rgba(52, 199, 89, 0.14);
+            color: #34c759;
+        }
+
+        #urdf-transform-status[data-type="error"] {
+            background: rgba(255, 69, 58, 0.14);
+            color: #ff6961;
+        }
+
         .floating-panel-header {
             padding: 16px;
             border-bottom: 0.5px solid var(--glass-border);
@@ -3726,6 +3881,9 @@
                     <button class="tool-button" id="open-editor-btn">
                         <span class="tool-button-text" data-i18n="edit"></span>
                     </button>
+                    <button class="tool-button" id="toggle-urdf-transform-panel">
+                        <span class="tool-button-text" data-i18n="urdfTransformButton"></span>
+                    </button>
                     <button class="tool-button" id="toggle-copied-frames-panel">
                         <span class="tool-button-text" data-i18n="copiedFrames"></span>
                     </button>
@@ -3838,6 +3996,87 @@
                 </div>
             </div>
 
+            <div id="floating-urdf-transform-panel" class="floating-panel">
+                <div class="floating-panel-header">
+                    <span data-i18n="urdfTransform"></span>
+                    <button class="panel-maximize-btn" data-panel-id="floating-urdf-transform-panel">⛶</button>
+                    <button class="panel-close-btn" data-panel="floating-urdf-transform-panel">✕</button>
+                </div>
+                <div class="floating-panel-content">
+                    <p class="urdf-transform-hint" data-i18n="urdfTransformHint"></p>
+
+                    <section class="urdf-transform-section">
+                        <h3 data-i18n="geometryOrigin"></h3>
+                        <label class="urdf-transform-field">
+                            <span data-i18n="selectLink"></span>
+                            <select id="urdf-transform-link"></select>
+                        </label>
+                        <label class="urdf-transform-field">
+                            <span data-i18n="selectGeometry"></span>
+                            <select id="urdf-transform-geometry"></select>
+                        </label>
+                        <fieldset id="urdf-geometry-fields" class="urdf-transform-fieldset">
+                            <div class="urdf-transform-field">
+                                <span data-i18n="positionXYZ"></span>
+                                <div class="urdf-vector-inputs">
+                                    <label>X <input id="urdf-geometry-position-x" type="number" step="any"></label>
+                                    <label>Y <input id="urdf-geometry-position-y" type="number" step="any"></label>
+                                    <label>Z <input id="urdf-geometry-position-z" type="number" step="any"></label>
+                                </div>
+                            </div>
+                            <div class="urdf-transform-field">
+                                <span data-i18n="rotationRPY"></span>
+                                <div class="urdf-vector-inputs">
+                                    <label>R <input id="urdf-geometry-rotation-x" type="number" step="any"></label>
+                                    <label>P <input id="urdf-geometry-rotation-y" type="number" step="any"></label>
+                                    <label>Y <input id="urdf-geometry-rotation-z" type="number" step="any"></label>
+                                </div>
+                            </div>
+                            <button id="urdf-apply-geometry" class="urdf-transform-apply" type="button" data-i18n="applyReload"></button>
+                        </fieldset>
+                    </section>
+
+                    <section class="urdf-transform-section">
+                        <h3 data-i18n="jointFrameAxis"></h3>
+                        <label class="urdf-transform-field">
+                            <span data-i18n="selectJoint"></span>
+                            <select id="urdf-transform-joint"></select>
+                        </label>
+                        <fieldset id="urdf-joint-fields" class="urdf-transform-fieldset">
+                            <div class="urdf-transform-field">
+                                <span data-i18n="positionXYZ"></span>
+                                <div class="urdf-vector-inputs">
+                                    <label>X <input id="urdf-joint-position-x" type="number" step="any"></label>
+                                    <label>Y <input id="urdf-joint-position-y" type="number" step="any"></label>
+                                    <label>Z <input id="urdf-joint-position-z" type="number" step="any"></label>
+                                </div>
+                            </div>
+                            <div class="urdf-transform-field">
+                                <span data-i18n="rotationRPY"></span>
+                                <div class="urdf-vector-inputs">
+                                    <label>R <input id="urdf-joint-rotation-x" type="number" step="any"></label>
+                                    <label>P <input id="urdf-joint-rotation-y" type="number" step="any"></label>
+                                    <label>Y <input id="urdf-joint-rotation-z" type="number" step="any"></label>
+                                </div>
+                            </div>
+                            <fieldset id="urdf-axis-fields" class="urdf-transform-fieldset">
+                                <div class="urdf-transform-field">
+                                    <span data-i18n="axisDirection"></span>
+                                    <div class="urdf-vector-inputs">
+                                        <label>X <input id="urdf-joint-axis-x" type="number" step="any"></label>
+                                        <label>Y <input id="urdf-joint-axis-y" type="number" step="any"></label>
+                                        <label>Z <input id="urdf-joint-axis-z" type="number" step="any"></label>
+                                    </div>
+                                </div>
+                            </fieldset>
+                            <button id="urdf-apply-joint" class="urdf-transform-apply" type="button" data-i18n="applyReload"></button>
+                        </fieldset>
+                    </section>
+
+                    <div id="urdf-transform-status" role="status" aria-live="polite" hidden></div>
+                </div>
+            </div>
+
             <div id="drop-zone">
                 <div id="drop-text">
                     <strong data-i18n="dropHint"></strong><br>
@@ -3888,6 +4127,11 @@
                 <div class="context-menu-item" data-action="copy-joint-axis">
                     <span class="context-menu-check" style="visibility:hidden"></span>
                     <span data-i18n="copyJointAxis">Copy Joint Axis</span>
+                </div>
+                <div class="context-menu-divider"></div>
+                <div class="context-menu-item" data-action="edit-urdf-transform">
+                    <span class="context-menu-check" style="visibility:hidden"></span>
+                    <span data-i18n="editURDFTransform">Edit URDF Transform</span>
                 </div>
             </div>
 

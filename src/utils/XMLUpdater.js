@@ -96,6 +96,38 @@ export class XMLUpdater {
         return blockContent.slice(0, openingEnd) + originTag + blockContent.slice(openingEnd);
     }
 
+    static findGeometryElement(xmlContent, linkName, elementType, elementIndex) {
+        if (!['visual', 'collision'].includes(elementType)) {
+            throw new Error(`Unsupported URDF geometry element: ${elementType}`);
+        }
+
+        const linkBlock = this.findNamedBlock(xmlContent, 'link', linkName);
+        if (!linkBlock) return null;
+
+        const elementRegex = new RegExp(
+            `<${elementType}\\b[^>]*(?:/\\s*>|>[\\s\\S]*?</${elementType}\\s*>)`,
+            'gi'
+        );
+        const elements = Array.from(this.maskComments(linkBlock.content).matchAll(elementRegex));
+        const elementMatch = elements[elementIndex];
+        if (!elementMatch) return null;
+
+        const relativeStart = elementMatch.index;
+        return {
+            linkBlock,
+            relativeStart,
+            element: linkBlock.content.slice(relativeStart, relativeStart + elementMatch[0].length)
+        };
+    }
+
+    static replaceGeometryElement(xmlContent, selection, updatedElement) {
+        const { linkBlock, relativeStart, element } = selection;
+        const updatedLink = linkBlock.content.slice(0, relativeStart)
+            + updatedElement
+            + linkBlock.content.slice(relativeStart + element.length);
+        return this.replaceBlock(xmlContent, linkBlock, updatedLink);
+    }
+
     /**
      * Update the origin of an individual visual or collision element in a URDF link.
      * @param {string} xmlContent
@@ -106,29 +138,37 @@ export class XMLUpdater {
      * @returns {string}
      */
     static updateURDFGeometryOrigin(xmlContent, linkName, elementType, elementIndex, origin) {
-        if (!['visual', 'collision'].includes(elementType)) {
-            throw new Error(`Unsupported URDF geometry element: ${elementType}`);
-        }
+        const selection = this.findGeometryElement(xmlContent, linkName, elementType, elementIndex);
+        if (!selection) return xmlContent;
 
-        const linkBlock = this.findNamedBlock(xmlContent, 'link', linkName);
-        if (!linkBlock) return xmlContent;
+        const updatedElement = this.updateOriginInBlock(selection.element, origin);
+        return this.replaceGeometryElement(xmlContent, selection, updatedElement);
+    }
 
-        const elementRegex = new RegExp(
-            `<${elementType}\\b[^>]*(?:/\\s*>|>[\\s\\S]*?</${elementType}\\s*>)`,
-            'gi'
-        );
-        const elements = Array.from(this.maskComments(linkBlock.content).matchAll(elementRegex));
-        const elementMatch = elements[elementIndex];
-        if (!elementMatch) return xmlContent;
+    /**
+     * Update the scale of the mesh inside an individual visual or collision.
+     * Negative components mirror the mesh on the corresponding local axes.
+     */
+    static updateURDFMeshScale(xmlContent, linkName, elementType, elementIndex, scale) {
+        const selection = this.findGeometryElement(xmlContent, linkName, elementType, elementIndex);
+        if (!selection) return xmlContent;
 
-        const relativeStart = elementMatch.index;
-        const originalElement = linkBlock.content.slice(relativeStart, relativeStart + elementMatch[0].length);
-        const updatedElement = this.updateOriginInBlock(originalElement, origin);
-        const updatedLink = linkBlock.content.slice(0, relativeStart)
-            + updatedElement
-            + linkBlock.content.slice(relativeStart + originalElement.length);
+        const scaleValue = this.formatVector(scale);
+        const meshRegex = /<mesh\b[^>]*(?:\/\s*>|>[\s\S]*?<\/mesh\s*>)/i;
+        const meshMatch = meshRegex.exec(this.maskComments(selection.element));
+        if (!meshMatch) return xmlContent;
 
-        return this.replaceBlock(xmlContent, linkBlock, updatedLink);
+        const originalMesh = selection.element.slice(meshMatch.index, meshMatch.index + meshMatch[0].length);
+        const openingTagMatch = originalMesh.match(/^<mesh\b[^>]*>/i);
+        if (!openingTagMatch) return xmlContent;
+
+        const updatedOpeningTag = this.updateAttribute(openingTagMatch[0], 'scale', scaleValue);
+        const updatedMesh = originalMesh.replace(openingTagMatch[0], updatedOpeningTag);
+        const updatedElement = selection.element.slice(0, meshMatch.index)
+            + updatedMesh
+            + selection.element.slice(meshMatch.index + originalMesh.length);
+
+        return this.replaceGeometryElement(xmlContent, selection, updatedElement);
     }
 
     /**
@@ -181,6 +221,55 @@ export class XMLUpdater {
                 updatedJoint = `${prefix}\n${axisTag}\n${closingIndent}${jointBlock.content.slice(closingIndex)}`;
             }
         }
+
+        return this.replaceBlock(xmlContent, jointBlock, updatedJoint);
+    }
+
+    /**
+     * Reverse finite lower/upper limits after reversing a joint axis.
+     * The equivalent range is lower' = -upper and upper' = -lower.
+     */
+    static reverseURDFJointLimits(xmlContent, jointName) {
+        const jointBlock = this.findNamedBlock(xmlContent, 'joint', jointName);
+        if (!jointBlock) return xmlContent;
+
+        const limitRegex = /<limit\b[^>]*(?:\/\s*>|>[\s\S]*?<\/limit\s*>)/i;
+        const limitMatch = limitRegex.exec(this.maskComments(jointBlock.content));
+        if (!limitMatch) return xmlContent;
+
+        const originalLimit = jointBlock.content.slice(
+            limitMatch.index,
+            limitMatch.index + limitMatch[0].length
+        );
+        const openingTagMatch = originalLimit.match(/^<limit\b[^>]*>/i);
+        if (!openingTagMatch) return xmlContent;
+
+        const openingTag = openingTagMatch[0];
+        const readFiniteAttribute = attributeName => {
+            const attributeRegex = new RegExp(
+                `\\b${attributeName}\\s*=\\s*(["'])([^"']*)\\1`,
+                'i'
+            );
+            const attributeMatch = attributeRegex.exec(openingTag);
+            if (!attributeMatch || !attributeMatch[2].trim()) return null;
+            const value = Number(attributeMatch[2]);
+            return Number.isFinite(value) ? value : null;
+        };
+
+        const lower = readFiniteAttribute('lower');
+        const upper = readFiniteAttribute('upper');
+        if (lower === null || upper === null) return xmlContent;
+
+        const formatLimit = value => {
+            const normalized = Math.abs(value) < 1e-12 ? 0 : value;
+            return Number(normalized.toPrecision(12)).toString();
+        };
+        let updatedOpeningTag = this.updateAttribute(openingTag, 'lower', formatLimit(-upper));
+        updatedOpeningTag = this.updateAttribute(updatedOpeningTag, 'upper', formatLimit(-lower));
+        const updatedLimit = originalLimit.replace(openingTag, updatedOpeningTag);
+        const updatedJoint = jointBlock.content.slice(0, limitMatch.index)
+            + updatedLimit
+            + jointBlock.content.slice(limitMatch.index + originalLimit.length);
 
         return this.replaceBlock(xmlContent, jointBlock, updatedJoint);
     }

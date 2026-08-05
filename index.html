@@ -1928,6 +1928,76 @@
             opacity: 0.45;
         }
 
+        .urdf-mirror-hint {
+            margin: -3px 0 7px;
+            color: var(--text-tertiary);
+            font-size: 10px;
+            line-height: 1.35;
+        }
+
+        .urdf-mirror-controls {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .urdf-mirror-button {
+            padding: 7px 5px;
+            border: 1px solid var(--glass-border);
+            border-radius: 7px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 600;
+            transition: all 0.15s ease;
+        }
+
+        .urdf-mirror-button:hover:not(:disabled) {
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+
+        .urdf-mirror-button.active {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: white;
+        }
+
+        .urdf-mirror-button:disabled {
+            cursor: default;
+            opacity: 0.45;
+        }
+
+        .urdf-limit-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 7px;
+            margin: -2px 0 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 10px;
+            line-height: 1.35;
+        }
+
+        .urdf-limit-option input {
+            margin: 1px 0 0;
+            accent-color: var(--accent);
+        }
+
+        .urdf-limit-option.disabled {
+            cursor: default;
+            opacity: 0.45;
+        }
+
+        .urdf-limit-hint {
+            margin: 0 0 10px 21px;
+            color: var(--text-tertiary);
+            font-size: 10px;
+            line-height: 1.35;
+        }
+
         #urdf-transform-status {
             margin-top: 4px;
             padding: 8px 10px;
@@ -4032,6 +4102,22 @@
                                     <label>Y <input id="urdf-geometry-rotation-z" type="number" step="any"></label>
                                 </div>
                             </div>
+                            <fieldset id="urdf-mesh-scale-fields" class="urdf-transform-fieldset">
+                                <div class="urdf-transform-field">
+                                    <span data-i18n="meshScaleXYZ"></span>
+                                    <div class="urdf-vector-inputs">
+                                        <label>X <input id="urdf-mesh-scale-x" type="number" step="any"></label>
+                                        <label>Y <input id="urdf-mesh-scale-y" type="number" step="any"></label>
+                                        <label>Z <input id="urdf-mesh-scale-z" type="number" step="any"></label>
+                                    </div>
+                                </div>
+                                <p class="urdf-mirror-hint" data-i18n="meshMirrorHint"></p>
+                                <div class="urdf-mirror-controls">
+                                    <button class="urdf-mirror-button" type="button" data-urdf-mirror-axis="x" data-i18n="mirrorX"></button>
+                                    <button class="urdf-mirror-button" type="button" data-urdf-mirror-axis="y" data-i18n="mirrorY"></button>
+                                    <button class="urdf-mirror-button" type="button" data-urdf-mirror-axis="z" data-i18n="mirrorZ"></button>
+                                </div>
+                            </fieldset>
                             <button id="urdf-apply-geometry" class="urdf-transform-apply" type="button" data-i18n="applyReload"></button>
                         </fieldset>
                     </section>
@@ -4068,6 +4154,11 @@
                                         <label>Z <input id="urdf-joint-axis-z" type="number" step="any"></label>
                                     </div>
                                 </div>
+                                <label id="urdf-reverse-limits-option" class="urdf-limit-option">
+                                    <input id="urdf-reverse-limits" type="checkbox" checked>
+                                    <span data-i18n="reverseLimitsWithAxis"></span>
+                                </label>
+                                <p class="urdf-limit-hint" data-i18n="reverseLimitsHint"></p>
                             </fieldset>
                             <button id="urdf-apply-joint" class="urdf-transform-apply" type="button" data-i18n="applyReload"></button>
                         </fieldset>

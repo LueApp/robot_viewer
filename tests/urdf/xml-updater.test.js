@@ -59,6 +59,30 @@ test('updates an existing collision origin without changing its other content', 
     assert.match(updated, /<mesh filename="part\.stl"\/>/);
 });
 
+test('adds mesh scale so negative components mirror selected axes', () => {
+    const updated = XMLUpdater.updateURDFMeshScale(
+        URDF,
+        'base',
+        'visual',
+        1,
+        [-1, 1, -1]
+    );
+
+    const link = XMLUpdater.findNamedBlock(updated, 'link', 'base').content;
+    assert.match(link, /<visual name="mesh">[\s\S]*?<mesh filename="part\.stl" scale="-1 1 -1"\/>/);
+    assert.doesNotMatch(link, /<collision>[\s\S]*?<mesh filename="part\.stl" scale=/);
+});
+
+test('updates an existing mesh scale and preserves its filename', () => {
+    const xml = URDF.replace(
+        '<mesh filename="part.stl"/>',
+        '<mesh scale="0.001 0.001 0.001" filename="part.stl"/>'
+    );
+    const updated = XMLUpdater.updateURDFMeshScale(xml, 'base', 'visual', 1, [0.001, -0.001, 0.001]);
+
+    assert.match(updated, /<mesh scale="0\.001 -0\.001 0\.001" filename="part\.stl"\/>/);
+});
+
 test('adds joint origin and axis in URDF child order', () => {
     let updated = XMLUpdater.updateURDFJointOrigin(
         URDF,
@@ -86,6 +110,39 @@ test('supports single-quoted names and updates an existing axis', () => {
     const updated = XMLUpdater.updateURDFJointAxis(xml, 'slide', [0, 0, -1]);
 
     assert.match(updated, /<axis xyz="0 0 -1"\/>/);
+});
+
+test('reverses joint limits when an axis direction is reversed', () => {
+    const xml = URDF.replace(
+        '<limit lower="-1" upper="1" effort="1" velocity="1"/>',
+        '<limit lower="-1" upper="2" effort="8" velocity="3" damping="0.2"/>'
+    );
+    const updated = XMLUpdater.reverseURDFJointLimits(xml, 'arm_joint');
+
+    assert.match(
+        updated,
+        /<limit lower="-2" upper="1" effort="8" velocity="3" damping="0\.2"\/>/
+    );
+});
+
+test('reverses single-quoted limits regardless of attribute order and ignores comments', () => {
+    const xml = `<robot name="limits">
+  <joint type='revolute' name='active'>
+    <!-- <limit lower='-9' upper='9' effort='1' velocity='1'/> -->
+    <limit velocity='4' upper='3.5' effort='2' lower='-0.25'/>
+  </joint>
+</robot>`;
+    const updated = XMLUpdater.reverseURDFJointLimits(xml, 'active');
+
+    assert.match(updated, /<!-- <limit lower='-9' upper='9' effort='1' velocity='1'\/> -->/);
+    assert.match(updated, /<limit velocity='4' upper="0\.25" effort='2' lower="-3\.5"\/>/);
+});
+
+test('does not reverse limits when the joint or finite range is missing', () => {
+    const missingUpper = URDF.replace(' upper="1"', '');
+
+    assert.equal(XMLUpdater.reverseURDFJointLimits(URDF, 'missing'), URDF);
+    assert.equal(XMLUpdater.reverseURDFJointLimits(missingUpper, 'arm_joint'), missingUpper);
 });
 
 test('returns the original XML when the requested target does not exist', () => {
@@ -127,4 +184,21 @@ test('ignores commented-out geometry and axis tags when selecting an element', (
     assert.match(updated, /<visual>\s*<origin xyz="1 2 3" rpy="0 0 0"\/>/);
     assert.match(updated, /<!-- <axis xyz="1 0 0"\/> -->/);
     assert.match(updated, /<axis xyz="0 1 0"\/>/);
+});
+
+test('ignores a commented mesh tag when updating active mesh scale', () => {
+    const xml = `<robot name="mesh_comments">
+  <link name="part">
+    <visual>
+      <geometry>
+        <!-- <mesh filename="old.stl" scale="9 9 9"/> -->
+        <mesh filename="active.stl"/>
+      </geometry>
+    </visual>
+  </link>
+</robot>`;
+    const updated = XMLUpdater.updateURDFMeshScale(xml, 'part', 'visual', 0, [1, -1, 1]);
+
+    assert.match(updated, /<!-- <mesh filename="old\.stl" scale="9 9 9"\/> -->/);
+    assert.match(updated, /<mesh filename="active\.stl" scale="1 -1 1"\/>/);
 });

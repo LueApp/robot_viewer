@@ -31,7 +31,7 @@
 - **Animation Editor (Experimental)**: Multi-clip dope sheet and Bézier graph editor with auto-key, multi-selection, undo/redo, play/record ranges, event and media tracks, pose snapshots, audio-reactive keys, live-input recording, autosave, and portable `.robotanim.json` projects
 - **Measurement Tools**: Measure distances between joints and links with 3D visualization, display X/Y/Z axis projections and total distance, support ground height measurement
 - **Code Editor**: Built-in CodeMirror editor with syntax highlighting and live preview
-- **Structured URDF Editing**: Move or rotate individual visual/collision geometries and edit joint frames or motion axes with automatic preview reload
+- **Structured URDF Editing**: Move, rotate, scale, or mirror individual visual/collision meshes; edit joint frames or motion axes with optional limit reversal and automatic preview reload
 - **Physics Simulation**: Integrated MuJoCo engine for dynamics simulation (MJCF models)
 - **Scene Management**: File tree and scene graph visualization with hierarchical structure
 

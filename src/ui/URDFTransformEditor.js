@@ -30,8 +30,12 @@ export class URDFTransformEditor {
         this.geometrySelect = document.getElementById('urdf-transform-geometry');
         this.jointSelect = document.getElementById('urdf-transform-joint');
         this.geometryFieldset = document.getElementById('urdf-geometry-fields');
+        this.meshScaleFields = document.getElementById('urdf-mesh-scale-fields');
+        this.mirrorButtons = Array.from(document.querySelectorAll('[data-urdf-mirror-axis]'));
         this.jointFieldset = document.getElementById('urdf-joint-fields');
         this.axisFields = document.getElementById('urdf-axis-fields');
+        this.reverseLimitsOption = document.getElementById('urdf-reverse-limits-option');
+        this.reverseLimitsCheckbox = document.getElementById('urdf-reverse-limits');
         this.geometryApplyButton = document.getElementById('urdf-apply-geometry');
         this.jointApplyButton = document.getElementById('urdf-apply-joint');
         this.status = document.getElementById('urdf-transform-status');
@@ -50,6 +54,9 @@ export class URDFTransformEditor {
         this.jointSelect?.addEventListener('change', () => this.loadSelectedJoint());
         this.geometryApplyButton?.addEventListener('click', () => this.applyGeometry());
         this.jointApplyButton?.addEventListener('click', () => this.applyJoint());
+        this.mirrorButtons.forEach(button => {
+            button.addEventListener('click', () => this.toggleMeshMirror(button.dataset.urdfMirrorAxis));
+        });
 
         document.getElementById('toggle-urdf-transform-panel')?.addEventListener('click', () => {
             setTimeout(() => this.refreshFromEditor(), 0);
@@ -104,6 +111,9 @@ export class URDFTransformEditor {
                         index,
                         shapeType,
                         filename,
+                        scale: shapeType === 'mesh'
+                            ? this.parseVector(shape.getAttribute('scale'), [1, 1, 1])
+                            : null,
                         origin: this.readOrigin(element)
                     });
                 });
@@ -116,13 +126,21 @@ export class URDFTransformEditor {
             const parent = this.directChild(jointElement, 'parent');
             const child = this.directChild(jointElement, 'child');
             const axis = this.directChild(jointElement, 'axis');
+            const limit = this.directChild(jointElement, 'limit');
+            const lowerText = limit?.getAttribute('lower');
+            const upperText = limit?.getAttribute('upper');
+            const lower = lowerText?.trim() ? Number(lowerText) : NaN;
+            const upper = upperText?.trim() ? Number(upperText) : NaN;
             return {
                 name: jointElement.getAttribute('name'),
                 type: jointElement.getAttribute('type') || 'fixed',
                 parent: parent?.getAttribute('link') || '',
                 child: child?.getAttribute('link') || '',
                 origin: this.readOrigin(jointElement),
-                axis: this.parseVector(axis?.getAttribute('xyz'), [1, 0, 0])
+                axis: this.parseVector(axis?.getAttribute('xyz'), [1, 0, 0]),
+                limits: Number.isFinite(lower) && Number.isFinite(upper)
+                    ? { lower, upper }
+                    : null
             };
         }).filter(joint => joint.name);
 
@@ -230,21 +248,73 @@ export class URDFTransformEditor {
         const link = this.parsed?.links.find(item => item.name === this.linkSelect?.value);
         const geometry = link?.geometries.find(item => item.key === this.geometrySelect?.value);
         this.geometryFieldset?.toggleAttribute('disabled', !geometry || this.isApplying);
-        if (!geometry) return;
+        const isMesh = geometry?.shapeType === 'mesh';
+        this.meshScaleFields?.toggleAttribute('disabled', !isMesh || this.isApplying);
+        if (!geometry) {
+            this.updateMirrorButtons([1, 1, 1], false);
+            return;
+        }
         this.setVector('urdf-geometry-position', geometry.origin.xyz);
         this.setVector('urdf-geometry-rotation', geometry.origin.rpy);
+        this.setVector('urdf-mesh-scale', geometry.scale || [1, 1, 1]);
+        this.updateMirrorButtons(geometry.scale || [1, 1, 1], isMesh);
+    }
+
+    updateMirrorButtons(scale, enabled = true) {
+        const axes = ['x', 'y', 'z'];
+        this.mirrorButtons.forEach(button => {
+            const index = axes.indexOf(button.dataset.urdfMirrorAxis);
+            button.classList.toggle('active', enabled && index >= 0 && scale[index] < 0);
+            button.disabled = !enabled || this.isApplying;
+        });
+    }
+
+    toggleMeshMirror(axis) {
+        const axes = ['x', 'y', 'z'];
+        const index = axes.indexOf(axis);
+        if (index < 0) return;
+
+        try {
+            const scale = this.readVector('urdf-mesh-scale');
+            if (Math.abs(scale[index]) < 1e-12) {
+                throw new Error(window.i18n.t('urdfZeroScale'));
+            }
+            scale[index] *= -1;
+            this.setVector('urdf-mesh-scale', scale);
+            this.updateMirrorButtons(scale);
+            this.showStatus(window.i18n.t('urdfMirrorPending'), 'info');
+        } catch (error) {
+            this.showStatus(error.message, 'error');
+        }
     }
 
     loadSelectedJoint() {
         const joint = this.parsed?.joints.find(item => item.name === this.jointSelect?.value);
         this.jointFieldset?.toggleAttribute('disabled', !joint || this.isApplying);
-        if (!joint) return;
+        if (!joint) {
+            this.setReverseLimitsEnabled(false);
+            return;
+        }
         this.setVector('urdf-joint-position', joint.origin.xyz);
         this.setVector('urdf-joint-rotation', joint.origin.rpy);
         this.setVector('urdf-joint-axis', joint.axis);
 
         const hasMotionAxis = !['fixed', 'floating'].includes(joint.type);
         this.axisFields?.toggleAttribute('disabled', !hasMotionAxis || this.isApplying);
+        this.setReverseLimitsEnabled(this.canReverseJointLimits(joint));
+    }
+
+    canReverseJointLimits(joint) {
+        return Boolean(
+            joint?.limits
+            && !['continuous', 'fixed', 'floating'].includes(joint.type)
+        );
+    }
+
+    setReverseLimitsEnabled(enabled) {
+        const isEnabled = enabled && !this.isApplying;
+        if (this.reverseLimitsCheckbox) this.reverseLimitsCheckbox.disabled = !isEnabled;
+        this.reverseLimitsOption?.classList.toggle('disabled', !isEnabled);
     }
 
     setEditorEnabled(enabled) {
@@ -288,16 +358,35 @@ export class URDFTransformEditor {
                 xyz: this.readVector('urdf-geometry-position'),
                 rpy: this.readVector('urdf-geometry-rotation')
             };
-            const content = this.codeEditorManager.getEditor().getValue();
-            const updated = XMLUpdater.updateURDFGeometryOrigin(
+            let content = this.codeEditorManager.getEditor().getValue();
+            content = XMLUpdater.updateURDFGeometryOrigin(
                 content,
                 link.name,
                 geometry.type,
                 geometry.index,
                 origin
             );
+
+            if (geometry.shapeType === 'mesh') {
+                const scale = this.readVector('urdf-mesh-scale');
+                if (scale.some(value => Math.abs(value) < 1e-12)) {
+                    throw new Error(window.i18n.t('urdfZeroScale'));
+                }
+                const scaleChanged = scale.some((value, index) =>
+                    Math.abs(value - geometry.scale[index]) > 1e-12
+                );
+                if (scaleChanged) {
+                    content = XMLUpdater.updateURDFMeshScale(
+                        content,
+                        link.name,
+                        geometry.type,
+                        geometry.index,
+                        scale
+                    );
+                }
+            }
             this.setApplying(true);
-            await this.commit(updated);
+            await this.commit(content);
         } catch (error) {
             this.showStatus(error.message, 'error');
         } finally {
@@ -322,11 +411,27 @@ export class URDFTransformEditor {
                 const axis = this.readVector('urdf-joint-axis');
                 const length = Math.hypot(...axis);
                 if (length < 1e-9) throw new Error(window.i18n.t('urdfZeroAxis'));
+                const normalizedAxis = axis.map(value => value / length);
                 content = XMLUpdater.updateURDFJointAxis(
                     content,
                     joint.name,
-                    axis.map(value => value / length)
+                    normalizedAxis
                 );
+
+                const oldAxisLength = Math.hypot(...joint.axis);
+                const oldAxis = oldAxisLength >= 1e-9
+                    ? joint.axis.map(value => value / oldAxisLength)
+                    : null;
+                const directionDot = oldAxis
+                    ? oldAxis.reduce((sum, value, index) => sum + value * normalizedAxis[index], 0)
+                    : 1;
+                if (
+                    this.reverseLimitsCheckbox?.checked
+                    && this.canReverseJointLimits(joint)
+                    && directionDot < -0.999999
+                ) {
+                    content = XMLUpdater.reverseURDFJointLimits(content, joint.name);
+                }
             }
 
             this.setApplying(true);

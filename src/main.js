@@ -21,6 +21,7 @@ import { i18n } from './utils/i18n.js';
 import { findParentLink } from './utils/JointDragControls.js';
 import { PoseController } from './animation/runtime/PoseController.js';
 import { AnimationWorkspace } from './animation/ui/AnimationWorkspace.js';
+import { LiveStatePanel } from './integrations/LiveStatePanel.js';
 
 // Expose d3 globally for PanelManager
 window.d3 = d3;
@@ -205,6 +206,7 @@ class App {
                 poseController: this.poseController
             });
             window.animationWorkspace = this.animationWorkspace;
+            this.liveStatePanel = new LiveStatePanel(this);
 
             // Set measurement update callback
             this.sceneManager.onMeasurementUpdate = () => {
@@ -975,6 +977,7 @@ class App {
      * Handle reset joints button
      */
     handleResetJoints() {
+        if (this.poseController?.liveLocked) return;
         if (this.currentModel && this.jointControlsUI) {
             this.jointControlsUI.resetAllJoints(this.currentModel);
         }
@@ -984,6 +987,7 @@ class App {
      * Handle vector input for setting all joints
      */
     handleVectorInput(text, options = {}) {
+        if (this.poseController?.liveLocked) return { success: false };
         if (this.currentModel && this.jointControlsUI) {
             return this.jointControlsUI.setAllJoints(this.currentModel, text, options);
         }
@@ -1085,6 +1089,7 @@ class App {
      * Handle MuJoCo reset
      */
     handleMujocoReset() {
+        if (this.poseController?.liveLocked) return;
         if (this.mujocoSimulationManager) {
             // Only reset simulation state, don't change run/pause state
             this.mujocoSimulationManager.reset();
@@ -1095,6 +1100,7 @@ class App {
      * Handle MuJoCo simulation toggle
      */
     async handleMujocoToggleSimulate() {
+        if (this.poseController?.liveLocked) return false;
         // If simulation not loaded, load first
         if (!this.mujocoSimulationManager.hasScene() && this.currentMJCFFile && this.currentMJCFModel) {
             try {
@@ -1142,6 +1148,7 @@ class App {
      */
     animate() {
         requestAnimationFrame(() => this.animate());
+        this.liveStatePanel?.update(performance.now());
         if (this.sceneManager) {
             this.sceneManager.update();
 

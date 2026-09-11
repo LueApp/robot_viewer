@@ -1,0 +1,10 @@
+.live-state-panel { position:fixed; right:18px; bottom:18px; z-index:1000; width:340px; max-height:80vh; overflow:auto; border:1px solid #51616c; border-radius:8px; background:#17232eef; color:#e5edf3; font:12px system-ui; box-shadow:0 6px 20px #0006; }
+.live-state-panel summary { padding:12px; cursor:pointer; font-weight:600; }
+.live-state-panel [data-status] { display:block; font-size:11px; color:#9bdccb; font-weight:400; margin-top:3px; }
+.live-state-content { padding:0 12px 12px; }
+.live-state-panel label { display:block; margin:8px 0; }
+.live-state-panel input:not([type=checkbox]), .live-state-panel select, .live-state-panel textarea { display:block; box-sizing:border-box; width:100%; margin-top:4px; }
+.live-state-panel input, .live-state-panel select, .live-state-panel textarea, .live-state-panel button { color:inherit; background:#253948; border:1px solid #516878; border-radius:4px; padding:5px; font:inherit; }
+.live-state-panel button { margin:3px 3px 3px 0; cursor:pointer; }
+.live-state-panel pre { max-height:160px; overflow:auto; white-space:pre-wrap; }
+.live-state-panel [data-diagnostics] { white-space:pre-wrap; color:#ffd096; }

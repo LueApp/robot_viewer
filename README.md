@@ -65,6 +65,45 @@ To try structured URDF editing without external assets, load the
 [`public/examples`](public/examples) folder and select
 `urdf-transform-demo.urdf`.
 
+## Live simulator display
+
+The **Live simulation** panel connects to a protocol-independent state stream,
+such as the sibling Behavior Sim runtime at `ws://localhost:8766/state`.
+Load [`behavior-sim.urdf`](public/examples/behavior-sim.urdf) to use its two-motor
+example. The stream carries named joint positions in radians/meters, simulation
+time, session/sequence identifiers, optional base pose and device diagnostics.
+
+Matching joint names map automatically. The panel supports explicit mappings,
+connection/stale-state diagnostics, target and measurement inspection, segmented
+motion recording, JSON import/export, replay and creation of editable animation
+clips. Live mode pauses competing animation/local physics and locks joint editing.
+Camera controls remain available. Disconnect keeps the last pose; **Return to
+local mode** explicitly unlocks editing. Out-of-limit telemetry is displayed with
+a diagnostic instead of silently clamped.
+
+The viewer is observational: it never sends motor commands. Closing it does not
+stop the simulator. It records the visualization snapshots it receives, not every
+controller cycle. Robot model assets remain loaded through the existing file UI.
+See `behavior-sim/spec/common-api.md` for the stream and coordinate conventions.
+
+### Create an animation clip from recorded motion
+
+1. Load the matching robot model and connect **Live simulation**.
+2. Click **Record motion**, let the simulator run for a few seconds, then click
+   **Stop recording**. The nearby indicator shows captured snapshot/segment counts.
+3. Select the recorded segment. Alternatively, open a previously exported
+   `.robotlive.json` file and select a segment from it.
+4. Click **Create animation clip**. This creates an editable copy named
+   **Recorded simulation**, selects it, opens the **Animation Editor**, and moves
+   its playhead to the beginning. The live viewer connection is disconnected.
+5. Press **▶ Play** in the Animation Editor or edit the timeline keyframes.
+
+This operation creates a clip from an existing recording; it does not start
+recording or download a file. Use **Export recording** to save the original
+capture, or the Animation Editor's project export to save editable clips. The
+original capture is retained in memory. Empty, zero-duration or unmapped captures
+produce an actionable message instead of an empty clip.
+
 ## Contributing
 
 We welcome contributions from the community! Whether you're fixing bugs, adding features, or improving documentation, your help is appreciated.

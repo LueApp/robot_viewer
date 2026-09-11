@@ -11,6 +11,7 @@ export class PoseController {
         this.sceneManager = sceneManager;
         this.model = null;
         this.listeners = new Set();
+        this.liveLocked = false;
     }
 
     setModel(model) {
@@ -50,6 +51,7 @@ export class PoseController {
             render = true,
             measure = true
         } = options;
+        if (this.liveLocked && source !== 'live') return null;
 
         const joint = this.model?.joints?.get(jointName);
         if (!joint || joint.type === 'fixed' || !Number.isFinite(value)) {
@@ -106,12 +108,14 @@ export class PoseController {
         });
     }
 
-    applyPose(values, { source = 'playback' } = {}) {
+    applyPose(values, { source = 'playback', ignoreLimits = false, applyConstraints = true } = {}) {
         if (!this.model || !values) return;
 
         Object.entries(values).forEach(([jointName, value]) => {
             this.setJointValue(jointName, value, {
                 source,
+                ignoreLimits,
+                applyConstraints,
                 commit: false,
                 render: false,
                 measure: false

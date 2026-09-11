@@ -987,7 +987,7 @@ export class AnimationWorkspace {
     }
 
     handlePoseEvent(event) {
-        if (event.type !== 'jointChanged' || event.source === 'playback') return;
+        if (event.type !== 'jointChanged' || event.source === 'playback' || event.source === 'live') return;
         const track = this.store.getTrack(event.jointName);
         if (track) this.selection.selectTrack(track.id);
 

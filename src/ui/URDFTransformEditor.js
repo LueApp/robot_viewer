@@ -1,4 +1,5 @@
 import { XMLUpdater } from '../utils/XMLUpdater.js';
+import { rebaseURDFJoint } from '../utils/URDFJointZero.js';
 
 /**
  * Structured editor for URDF visual/collision origins and joint frames/axes.
@@ -6,8 +7,9 @@ import { XMLUpdater } from '../utils/XMLUpdater.js';
  * relevant tag and asks CodeEditorManager to reload the preview.
  */
 export class URDFTransformEditor {
-    constructor(codeEditorManager) {
+    constructor(codeEditorManager, poseController = null) {
         this.codeEditorManager = codeEditorManager;
+        this.poseController = poseController;
         this.model = null;
         this.file = null;
         this.parsed = null;
@@ -38,6 +40,10 @@ export class URDFTransformEditor {
         this.reverseLimitsCheckbox = document.getElementById('urdf-reverse-limits');
         this.geometryApplyButton = document.getElementById('urdf-apply-geometry');
         this.jointApplyButton = document.getElementById('urdf-apply-joint');
+        this.zeroFields = document.getElementById('urdf-zero-fields');
+        this.zeroInput = document.getElementById('urdf-zero-offset');
+        this.zeroLabel = document.getElementById('urdf-zero-label');
+        this.zeroPreview = document.getElementById('urdf-zero-preview');
         this.status = document.getElementById('urdf-transform-status');
     }
 
@@ -54,6 +60,9 @@ export class URDFTransformEditor {
         this.jointSelect?.addEventListener('change', () => this.loadSelectedJoint());
         this.geometryApplyButton?.addEventListener('click', () => this.applyGeometry());
         this.jointApplyButton?.addEventListener('click', () => this.applyJoint());
+        this.zeroInput?.addEventListener('input', () => this.updateZeroPreview());
+        document.getElementById('urdf-zero-current')?.addEventListener('click', () => this.useCurrentZero());
+        document.getElementById('urdf-apply-zero')?.addEventListener('click', () => this.applyZero());
         this.mirrorButtons.forEach(button => {
             button.addEventListener('click', () => this.toggleMeshMirror(button.dataset.urdfMirrorAxis));
         });
@@ -138,6 +147,7 @@ export class URDFTransformEditor {
                 child: child?.getAttribute('link') || '',
                 origin: this.readOrigin(jointElement),
                 axis: this.parseVector(axis?.getAttribute('xyz'), [1, 0, 0]),
+                mimic: Boolean(this.directChild(jointElement, 'mimic')),
                 limits: Number.isFinite(lower) && Number.isFinite(upper)
                     ? { lower, upper }
                     : null
@@ -183,7 +193,7 @@ export class URDFTransformEditor {
             );
             this.loadSelectedJoint();
             this.setEditorEnabled(true);
-            if (this.status?.dataset.type === 'error' && !this.isApplying) {
+            if (['error', 'info'].includes(this.status?.dataset.type) && !this.isApplying) {
                 this.showStatus('', 'info');
             }
         } catch (error) {
@@ -291,6 +301,7 @@ export class URDFTransformEditor {
     loadSelectedJoint() {
         const joint = this.parsed?.joints.find(item => item.name === this.jointSelect?.value);
         this.jointFieldset?.toggleAttribute('disabled', !joint || this.isApplying);
+        this.zeroFields?.toggleAttribute('disabled', !this.canAdjustZero(joint) || this.isApplying);
         if (!joint) {
             this.setReverseLimitsEnabled(false);
             return;
@@ -302,6 +313,83 @@ export class URDFTransformEditor {
         const hasMotionAxis = !['fixed', 'floating'].includes(joint.type);
         this.axisFields?.toggleAttribute('disabled', !hasMotionAxis || this.isApplying);
         this.setReverseLimitsEnabled(this.canReverseJointLimits(joint));
+        if (this.zeroLabel) {
+            this.zeroLabel.textContent = window.i18n.t(joint.type === 'prismatic' ? 'urdfZeroMeters' : 'urdfZeroDegrees');
+        }
+        this.useCurrentZero();
+    }
+
+    canAdjustZero(joint) {
+        return this.isSupported && joint && !joint.mimic
+            && ['revolute', 'continuous', 'prismatic'].includes(joint.type);
+    }
+
+    useCurrentZero() {
+        if (!this.zeroInput) return;
+        const joint = this.parsed?.joints.find(item => item.name === this.jointSelect?.value);
+        const value = this.model?.joints?.get(joint?.name)?.currentValue ?? 0;
+        this.zeroInput.value = Number((joint?.type === 'prismatic' ? value : value * 180 / Math.PI).toPrecision(12));
+        this.updateZeroPreview();
+    }
+
+    updateZeroPreview() {
+        if (!this.zeroPreview) return;
+        const joint = this.parsed?.joints.find(item => item.name === this.jointSelect?.value);
+        const value = this.zeroInput?.value.trim();
+        const offset = value ? Number(value) : NaN;
+        if (!this.canAdjustZero(joint) || !Number.isFinite(offset)) {
+            this.zeroPreview.textContent = '';
+            return;
+        }
+        if (joint.type === 'continuous' || !joint.limits) {
+            this.zeroPreview.textContent = window.i18n.t('urdfZeroNoLimits');
+            return;
+        }
+        const factor = joint.type === 'prismatic' ? 1 : 180 / Math.PI;
+        const format = number => Number(number.toFixed(6)).toString();
+        this.zeroPreview.textContent = window.i18n.t('urdfZeroNewLimits')
+            .replace('{lower}', format(joint.limits.lower * factor - offset))
+            .replace('{upper}', format(joint.limits.upper * factor - offset))
+            .replace('{unit}', joint.type === 'prismatic' ? 'm' : '°');
+    }
+
+    async applyZero() {
+        if (this.isApplying) return;
+        try {
+            if (this.poseController?.liveLocked) throw new Error(window.i18n.t('urdfZeroLiveLocked'));
+            const content = this.codeEditorManager.getEditor().getValue();
+            // Read current XML synchronously; the normal panel refresh is debounced.
+            const joints = this.parseURDF(content).joints;
+            const joint = joints.find(item => item.name === this.jointSelect.value);
+            if (!this.canAdjustZero(joint)) throw new Error(window.i18n.t('urdfZeroUnsupported'));
+            const text = this.zeroInput.value.trim();
+            const offset = text ? Number(text) * (joint.type === 'prismatic' ? 1 : Math.PI / 180) : NaN;
+            const updated = rebaseURDFJoint(content, joint.name, offset);
+            const pose = this.poseController?.getPose();
+            if (pose) {
+                pose[joint.name] = 0;
+                // Followers are driven by their source joint when the pose is restored.
+                joints.filter(item => item.mimic).forEach(item => delete pose[item.name]);
+            }
+            const previousModel = this.model;
+            this.setApplying(true);
+            await this.commit(updated);
+            if (this.model === previousModel) throw new Error(window.i18n.t('reloadFailed'));
+            if (pose) this.poseController.applyPose(pose, { source: 'urdf-zero', ignoreLimits: true, applyConstraints: false });
+            this.refreshFromEditor();
+            this.showStatus(window.i18n.t('urdfZeroApplied'), 'success');
+        } catch (error) {
+            this.showStatus(error.message, 'error');
+        } finally {
+            this.setApplying(false);
+        }
+    }
+
+    openJointZero(jointName) {
+        this.selectJoint(jointName, true);
+        this.zeroFields?.scrollIntoView({ block: 'nearest' });
+        this.zeroInput?.focus();
+        this.zeroInput?.select();
     }
 
     canReverseJointLimits(joint) {
@@ -323,6 +411,7 @@ export class URDFTransformEditor {
         this.jointSelect.disabled = !enabled || !this.parsed?.joints.length;
         this.geometryFieldset?.toggleAttribute('disabled', !enabled || this.isApplying);
         this.jointFieldset?.toggleAttribute('disabled', !enabled || this.isApplying);
+        this.zeroFields?.toggleAttribute('disabled', !enabled || this.isApplying);
         if (enabled) {
             this.loadSelectedGeometry();
             this.loadSelectedJoint();

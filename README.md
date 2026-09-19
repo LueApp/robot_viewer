@@ -65,6 +65,19 @@ To try structured URDF editing without external assets, load the
 [`public/examples`](public/examples) folder and select
 `urdf-transform-demo.urdf`.
 
+To recalibrate a motor's zero, click **Set zero** beside its joint name (or open
+**URDF Transform → Adjust joint zero**). Enter the old angle that should become
+zero, in degrees, or click **Use current pose**, then **Set zero & Reload**.
+For a joint limited to 0°–90°, entering 45° rotates its zero pose to the old 45°
+position and changes its limits to −45°–45°. The complete attached link subtree,
+including collision and inertia, follows the new joint frame. Other independent
+joints retain their poses. Prismatic joints use meters; continuous joints remain
+unbounded. Mimic followers retain their relationship through an updated offset;
+adjust their driving joint. Download the edited URDF from the code editor to save
+it. Existing animation keyframes are not recalibrated by this operation.
+Try [`joint-zero-demo.urdf`](public/examples/joint-zero-demo.urdf) for a self-contained
+0°–90° example with no external mesh files.
+
 ## Live simulator display
 
 The **Live simulation** panel connects to a protocol-independent state stream,

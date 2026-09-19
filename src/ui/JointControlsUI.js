@@ -32,7 +32,7 @@ export class JointControlsUI {
         if (!slider) return;
         slider.value = value;
         const control = slider.closest('.joint-control');
-        control?._updateDisplay?.();
+        control?._updateDisplay?.(value);
     }
 
     /**
@@ -231,6 +231,18 @@ export class JointControlsUI {
 
         header.appendChild(name);
 
+        if (this.urdfTransformEditor?.isSupported
+            && ['revolute', 'continuous', 'prismatic'].includes(joint.type)
+            && !joint.threeObject?.isURDFMimicJoint) {
+            const zeroButton = document.createElement('button');
+            zeroButton.type = 'button';
+            zeroButton.className = 'joint-zero-button';
+            zeroButton.textContent = window.i18n.t('urdfSetZero');
+            zeroButton.title = window.i18n.t('urdfZeroHint');
+            zeroButton.addEventListener('click', () => this.urdfTransformEditor.openJointZero(joint.name));
+            header.appendChild(zeroButton);
+        }
+
         // Second row: editable limit labels + slider
         const sliderRow = document.createElement('div');
         sliderRow.className = 'joint-slider-row';
@@ -288,9 +300,11 @@ export class JointControlsUI {
             maxLabel.value = this.toDisplayValue(joint, currentMax).toFixed(decimals);
         };
 
-        const updateValueInput = () => {
-            const value = parseFloat(slider.value);
-            valueInput.value = this.toDisplayValue(joint, value).toFixed(this.getDisplayDecimals(joint));
+        const updateValueInput = (value = parseFloat(slider.value)) => {
+            const decimals = this.getDisplayDecimals(joint);
+            const displayed = this.toDisplayValue(joint, value).toFixed(decimals);
+            // Range inputs can introduce a tiny negative step error at zero.
+            valueInput.value = Number(displayed) === 0 ? (0).toFixed(decimals) : displayed;
         };
 
         updateLabels();
@@ -647,8 +661,8 @@ export class JointControlsUI {
         });
 
         // Save update function
-        div._updateDisplay = () => {
-            updateValueInput();
+        div._updateDisplay = (value) => {
+            updateValueInput(value);
             updateLabels();
             valueUnit.textContent = this.getJointUnit(joint);
         };

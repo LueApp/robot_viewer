@@ -230,11 +230,12 @@ class App {
             this.codeEditorManager = new CodeEditorManager();
             this.codeEditorManager.init(this.fileHandler.getFileMap());
 
-            this.urdfTransformEditor = new URDFTransformEditor(this.codeEditorManager);
+            this.urdfTransformEditor = new URDFTransformEditor(this.codeEditorManager, this.poseController);
 
             // Set code editor manager to joint controls UI
             if (this.jointControlsUI) {
                 this.jointControlsUI.setCodeEditorManager(this.codeEditorManager);
+                this.jointControlsUI.urdfTransformEditor = this.urdfTransformEditor;
             }
 
             // Set code editor manager to model graph view

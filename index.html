@@ -1850,6 +1850,7 @@
         }
 
         .urdf-transform-field select,
+        .urdf-transform-field > input,
         .urdf-vector-inputs input {
             box-sizing: border-box;
             border: 1px solid var(--glass-border);
@@ -1860,7 +1861,8 @@
             font: inherit;
         }
 
-        .urdf-transform-field select {
+        .urdf-transform-field select,
+        .urdf-transform-field > input {
             width: 100%;
             padding: 7px 8px;
         }
@@ -1892,6 +1894,7 @@
         }
 
         .urdf-transform-field select:focus,
+        .urdf-transform-field > input:focus,
         .urdf-vector-inputs input:focus {
             border-color: var(--accent);
         }
@@ -2840,6 +2843,28 @@
             justify-content: space-between;
             align-items: center;
             gap: 10px;
+        }
+
+        .joint-zero-button {
+            flex-shrink: 0;
+            padding: 3px 6px;
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 10px;
+        }
+
+        .joint-zero-button:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        #urdf-zero-fields {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--glass-border);
         }
 
         .joint-name {
@@ -4161,6 +4186,17 @@
                                 <p class="urdf-limit-hint" data-i18n="reverseLimitsHint"></p>
                             </fieldset>
                             <button id="urdf-apply-joint" class="urdf-transform-apply" type="button" data-i18n="applyReload"></button>
+                        </fieldset>
+                        <fieldset id="urdf-zero-fields" class="urdf-transform-fieldset" disabled>
+                            <h3 data-i18n="urdfZeroTitle"></h3>
+                            <p class="urdf-limit-hint" data-i18n="urdfZeroHint"></p>
+                            <label class="urdf-transform-field">
+                                <span id="urdf-zero-label" data-i18n="urdfZeroDegrees"></span>
+                                <input id="urdf-zero-offset" type="number" step="any" value="0">
+                            </label>
+                            <button id="urdf-zero-current" class="urdf-mirror-button" type="button" data-i18n="urdfZeroUseCurrent"></button>
+                            <p id="urdf-zero-preview" class="urdf-limit-hint" role="status" aria-live="polite"></p>
+                            <button id="urdf-apply-zero" class="urdf-transform-apply" type="button" data-i18n="urdfZeroApply"></button>
                         </fieldset>
                     </section>
 

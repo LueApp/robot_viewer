@@ -8,6 +8,7 @@ import { SceneManager } from './renderer/SceneManager.js';
 import { UIController } from './ui/UIController.js';
 import { FileHandler } from './controllers/FileHandler.js';
 import { JointControlsUI } from './ui/JointControlsUI.js';
+import { EndMoveControls } from './ui/EndMoveControls.js';
 import { URDFTransformEditor } from './ui/URDFTransformEditor.js';
 import { GravityCompensationUI } from './ui/GravityCompensationUI.js';
 import { PanelManager } from './ui/PanelManager.js';
@@ -36,6 +37,7 @@ class App {
         this.uiController = null;
         this.fileHandler = null;
         this.jointControlsUI = null;
+        this.endMoveControls = null;
         this.urdfTransformEditor = null;
         this.gravityUI = null;
         this.panelManager = null;
@@ -132,6 +134,7 @@ class App {
 
             this.poseController = new PoseController(this.sceneManager);
             this.sceneManager.setPoseController(this.poseController);
+            this.endMoveControls = new EndMoveControls(this.sceneManager, this.poseController);
 
             // Create USD viewer container (container only, WASM initialized on demand)
             this.createUSDViewerContainer();
@@ -166,6 +169,7 @@ class App {
 
             // Initialize model graph view
             this.modelGraphView = new ModelGraphView(this.sceneManager);
+            this.modelGraphView.onLinkSelected = name => this.endMoveControls?.selectLink(name);
 
             // Initialize file tree view
             this.fileTreeView = new FileTreeView();
@@ -408,6 +412,7 @@ class App {
             }
 
             this.currentModel = model;
+            this.endMoveControls?.setModel(null);
             this.animationWorkspace?.setModel(null, file.name);
             this.updateModelInfo(model, file);
 
@@ -525,6 +530,7 @@ class App {
 
         // Add to scene (render in background under snapshot)
         this.sceneManager.addModel(model);
+        this.endMoveControls?.setModel(isMesh ? null : model);
 
         // Hide drop zone
         const dropZone = document.getElementById('drop-zone');
@@ -636,6 +642,7 @@ class App {
         let mouseDownTime = 0;
 
         canvas.addEventListener('mousedown', (event) => {
+            if (this.endMoveControls?.active) return;
             if (event.button === 0) {
                 mouseDownPos = { x: event.clientX, y: event.clientY };
                 mouseDownTime = Date.now();
@@ -643,6 +650,7 @@ class App {
         }, true);
 
         canvas.addEventListener('mouseup', (event) => {
+            if (this.endMoveControls?.active) return;
             if (event.button !== 0 || !this.sceneManager || !mouseDownPos) return;
 
             const dx = event.clientX - mouseDownPos.x;

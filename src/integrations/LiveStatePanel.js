@@ -119,6 +119,7 @@ export class LiveStatePanel {
             if (this.app.sceneManager?.dragControls) this.app.sceneManager.dragControls.enabled = false;
             if (this.app.currentModel?.threeObject) this.app.currentModel.threeObject.visible = true;
         } else if (this.app.sceneManager?.dragControls) this.app.sceneManager.dragControls.enabled = true;
+        this.app.endMoveControls?.syncLock();
     }
 
     connect() {

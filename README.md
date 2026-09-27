@@ -65,6 +65,23 @@ To try structured URDF editing without external assets, load the
 [`public/examples`](public/examples) folder and select
 `urdf-transform-demo.urdf`.
 
+### Move a robot end
+
+Load a URDF, Xacro, or MJCF robot, then click **Move end** in the Joints panel.
+Select a link in the viewport, model tree, or End link list. Drag an X/Y/Z
+handle, or choose **Custom** and enter a direction vector. Directions can use
+the end link frame or the robot frame. **Position only** lets the end rotate;
+**Position + orientation** keeps its orientation from the start of each move.
+Enter a signed distance in millimeters or use the step buttons. With the canvas
+focused, X/Y/Z selects an axis, arrow keys nudge, and Shift makes a nudge ten
+times larger. Unreachable moves report their position or orientation error.
+Open **Joint hold weights** to bias which joints the IK solver moves. The fields
+form a vector in root-to-end order: 0% is free, intermediate values resist
+motion, and 100% locks that joint exactly. These weights control pose editing;
+they do not represent actuator torque limits.
+End movement currently supports serial joint chains; closed-chain constraints
+and the separate USD viewer are not supported.
+
 To recalibrate a motor's zero, click **Set zero** beside its joint name (or open
 **URDF Transform → Adjust joint zero**). Enter the old angle that should become
 zero, in degrees, or click **Use current pose**, then **Set zero & Reload**.

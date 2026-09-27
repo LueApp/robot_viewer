@@ -4040,11 +4040,65 @@
                     </div>
                 </div>
                 <div id="vector-input-area">
+                    <button class="control-button" id="toggle-end-move" type="button" data-i18n="endMove">Move end</button>
                     <div class="vector-input-row">
                         <input type="text" id="vector-input-field" data-i18n="vectorInputPlaceholder" autocomplete="off" spellcheck="false">
                         <button id="vector-apply-btn" data-i18n="vectorApply"></button>
                     </div>
                     <div id="vector-input-notification" role="alert" aria-live="polite" hidden></div>
+                </div>
+                <div id="end-move-controls" hidden>
+                    <div class="end-move-row">
+                        <label for="end-move-link" data-i18n="endLink">End link</label>
+                        <select id="end-move-link"></select>
+                    </div>
+                    <div class="end-move-row">
+                        <label for="end-move-frame" data-i18n="directionFrame">Direction frame</label>
+                        <select id="end-move-frame">
+                            <option value="end" data-i18n="endFrame">End frame</option>
+                            <option value="robot" data-i18n="robotFrame">Robot frame</option>
+                        </select>
+                    </div>
+                    <div class="end-move-row">
+                        <label for="end-move-ik" data-i18n="ikConstraint">IK constraint</label>
+                        <select id="end-move-ik">
+                            <option value="position" data-i18n="positionOnly">Position only</option>
+                            <option value="pose" data-i18n="positionOrientation">Position + orientation</option>
+                        </select>
+                    </div>
+                    <details id="end-move-weights">
+                        <summary data-i18n="jointHoldWeights">Joint hold weights</summary>
+                        <div class="end-move-weights-head">
+                            <span data-i18n="jointWeightHint">0% free · 100% locked</span>
+                            <button id="end-move-reset-weights" type="button" data-i18n="resetWeights">Reset weights</button>
+                        </div>
+                        <div id="end-move-weight-list"></div>
+                    </details>
+                    <div class="end-move-row end-move-axis-row">
+                        <span data-i18n="direction">Direction</span>
+                        <button type="button" data-end-axis="x">X</button>
+                        <button type="button" data-end-axis="y">Y</button>
+                        <button type="button" data-end-axis="z">Z</button>
+                        <button type="button" data-end-axis="custom" data-i18n="customDirection">Custom</button>
+                    </div>
+                    <div class="end-move-row" id="end-move-vector-row" hidden>
+                        <label for="end-move-vector-x" data-i18n="vectorXYZ">Vector XYZ</label>
+                        <input id="end-move-vector-x" type="number" step="any" value="1" aria-label="Vector X">
+                        <input id="end-move-vector-y" type="number" step="any" value="0" aria-label="Vector Y">
+                        <input id="end-move-vector-z" type="number" step="any" value="0" aria-label="Vector Z">
+                    </div>
+                    <div class="end-move-row">
+                        <label for="end-move-distance" data-i18n="moveByMm">Move by (mm)</label>
+                        <input id="end-move-distance" type="number" step="any" value="10">
+                        <button id="end-move-apply" type="button" data-i18n="vectorApply">Apply</button>
+                    </div>
+                    <div class="end-move-row">
+                        <label for="end-move-step" data-i18n="stepMm">Step (mm)</label>
+                        <input id="end-move-step" type="number" min="0.01" step="any" value="1">
+                        <button id="end-move-minus" type="button" aria-label="Move negative">−</button>
+                        <button id="end-move-plus" type="button" aria-label="Move positive">+</button>
+                    </div>
+                    <div id="end-move-status" role="status" aria-live="polite"></div>
                 </div>
                 <div class="floating-panel-content" id="joint-controls">
                     <div class="empty-state" data-i18n="noModel"></div>

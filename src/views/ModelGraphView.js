@@ -397,6 +397,7 @@ export class ModelGraphView {
                     this.codeEditorManager.scrollToLink(d.data.name);
                 }
                 this.urdfTransformEditor?.selectLink(d.data.name);
+                this.onLinkSelected?.(d.data.name);
             }
         });
 

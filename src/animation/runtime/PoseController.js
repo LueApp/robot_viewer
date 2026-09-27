@@ -108,6 +108,36 @@ export class PoseController {
         });
     }
 
+    /** Apply a multi-joint preview with one render and measurement update. */
+    applyJointValues(values, { source = 'viewport', ignoreLimits = false } = {}) {
+        if (this.liveLocked || !this.model || !values) return null;
+        const applied = {};
+        Object.entries(values).forEach(([jointName, value]) => {
+            const result = this.setJointValue(jointName, value, {
+                source, ignoreLimits, commit: false, render: false, measure: false
+            });
+            if (result !== null) applied[jointName] = result;
+        });
+        if (!Object.keys(applied).length) return null;
+        this.sceneManager?.redraw();
+        this.sceneManager?.onMeasurementUpdate?.();
+        this.emit({ type: 'poseChanged', values: applied, source, commit: false });
+        return applied;
+    }
+
+    /** Commit all joints changed by one end-effector edit together. */
+    commitJointValues(jointNames, { source = 'viewport' } = {}) {
+        if (this.liveLocked || !this.model) return;
+        const values = {};
+        jointNames.forEach(name => {
+            const joint = this.model.joints.get(name);
+            if (joint && joint.type !== 'fixed') values[name] = joint.currentValue ?? 0;
+        });
+        if (Object.keys(values).length) {
+            this.emit({ type: 'poseChanged', values, source, commit: true });
+        }
+    }
+
     applyPose(values, { source = 'playback', ignoreLimits = false, applyConstraints = true } = {}) {
         if (!this.model || !values) return;
 

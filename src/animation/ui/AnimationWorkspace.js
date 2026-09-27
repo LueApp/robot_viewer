@@ -987,6 +987,17 @@ export class AnimationWorkspace {
     }
 
     handlePoseEvent(event) {
+        if (event.type === 'poseChanged') {
+            if (this.visible && this.autoKey && event.commit && ['user', 'viewport'].includes(event.source)) {
+                this.store.beginTransaction('Key end movement');
+                Object.entries(event.values).forEach(([jointName, value]) => {
+                    this.store.upsertKeyframe(jointName, this.playback.currentTimeMs, value);
+                });
+                this.store.endTransaction();
+                this.updateGuide();
+            }
+            return;
+        }
         if (event.type !== 'jointChanged' || event.source === 'playback' || event.source === 'live') return;
         const track = this.store.getTrack(event.jointName);
         if (track) this.selection.selectTrack(track.id);

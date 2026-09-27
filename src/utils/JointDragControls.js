@@ -433,6 +433,7 @@ export class PointerJointDragControls extends JointDragControls {
         };
 
         this._mouseDown = e => {
+            if (!this.enabled) return;
             if (e.button !== 0) return;
             updateMouse(e);
             raycaster.setFromCamera(mouse, this.camera);
@@ -504,6 +505,7 @@ export class PointerJointDragControls extends JointDragControls {
         };
 
         this._mouseMove = e => {
+            if (!this.enabled) return;
             updateMouse(e);
             raycaster.setFromCamera(mouse, this.camera);
             this.moveRay(raycaster.ray);
@@ -586,4 +588,3 @@ export class PointerJointDragControls extends JointDragControls {
 
 // For backward compatibility, export old names
 export { JointDragControls as URDFDragControls, PointerJointDragControls as PointerURDFDragControls, findParentLink };
-

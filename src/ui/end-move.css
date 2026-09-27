@@ -1,0 +1,62 @@
+#end-move-controls {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--glass-border);
+    font-size: 12px;
+}
+
+#end-move-controls[hidden], #end-move-vector-row[hidden] { display: none; }
+
+#floating-joints-panel.end-move-active #joint-controls,
+#floating-joints-panel.end-move-active #vector-input-area .vector-input-row,
+#floating-joints-panel.end-move-active #vector-input-notification { display: none; }
+
+#toggle-end-move { width: 100%; margin-bottom: 7px; }
+
+#end-move-weights {
+    margin: 4px 0 10px;
+    padding: 6px 8px;
+    border: 1px solid var(--glass-border);
+    border-radius: 6px;
+}
+
+#end-move-weights summary { cursor: pointer; }
+.end-move-weights-head { display: flex; align-items: center; justify-content: space-between; gap: 5px; margin: 8px 0; color: var(--text-secondary); }
+.end-move-weights-head button { padding: 4px 6px; color: var(--text-primary); background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 6px; cursor: pointer; }
+#end-move-weight-list { max-height: 170px; overflow-y: auto; }
+.end-move-weight-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.end-move-weight-row label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.end-move-weight-row input { width: 56px; padding: 4px; color: var(--text-primary); background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 6px; }
+
+.end-move-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 7px;
+}
+
+.end-move-row label, .end-move-row > span { min-width: 100px; }
+.end-move-row select, .end-move-row input {
+    min-width: 0;
+    flex: 1;
+    padding: 5px;
+    color: var(--text-primary);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 6px;
+}
+
+.end-move-row button {
+    padding: 5px 8px;
+    color: var(--text-primary);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.end-move-row button.active { color: white; background: var(--accent); }
+.end-move-axis-row button { flex: 1; }
+#end-move-status { min-height: 1.4em; color: var(--text-secondary); }

@@ -1272,6 +1272,7 @@ export class MujocoSimulationManager {
         if (this.sceneManager.dragControls) {
             this.sceneManager.dragControls.enabled = false;
         }
+        this.sceneManager.endMoveControls?.syncLock();
 
         // Clear original model highlights
         if (this.sceneManager.highlightManager) {
@@ -1300,6 +1301,7 @@ export class MujocoSimulationManager {
         if (this.sceneManager.dragControls) {
             this.sceneManager.dragControls.enabled = true;
         }
+        this.sceneManager.endMoveControls?.syncLock();
     }
 
     /**
@@ -1384,6 +1386,7 @@ export class MujocoSimulationManager {
         if (this.sceneManager.dragControls) {
             this.sceneManager.dragControls.enabled = true;
         }
+        this.sceneManager.endMoveControls?.syncLock();
 
         // Clear drag manager
         if (this.dragStateManager) {
@@ -1602,4 +1605,3 @@ export class MujocoSimulationManager {
         return this.isLoaded;
     }
 }
-

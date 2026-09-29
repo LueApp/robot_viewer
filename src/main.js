@@ -295,6 +295,22 @@ class App {
 
             // Initialize measurement controller
             this.measurementController = new MeasurementController(this.sceneManager);
+            const measureButton = document.getElementById('measure-length-btn');
+            const measureHint = document.getElementById('measure-length-hint');
+            measureButton?.addEventListener('click', () => {
+                const active = !this.measurementController.pointMeasurementActive;
+                this.measurementController.setPointMeasurementActive(active);
+                measureButton.classList.toggle('active', active);
+                measureButton.setAttribute('aria-pressed', String(active));
+                if (measureHint) {
+                    measureHint.hidden = !active;
+                    measureHint.textContent = active ? 'Hover over the model and click the highlighted point (Esc to exit)' : '';
+                }
+                canvas.classList.toggle('measuring-length', active);
+                measureButton.title = active
+                    ? 'Click two points on the model to measure their distance. Press Escape or click again to exit.'
+                    : 'Click two points on the model to measure their distance';
+            });
 
             // Associate measurement controller with model graph view
             if (this.modelGraphView) {
@@ -641,6 +657,32 @@ class App {
         let mouseDownPos = null;
         let mouseDownTime = 0;
 
+        const getModelHit = (event) => {
+            const modelObject = this.sceneManager?.currentModel?.threeObject;
+            if (!modelObject) return null;
+            const rect = canvas.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                -((event.clientY - rect.top) / rect.height) * 2 + 1
+            );
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, this.sceneManager.camera);
+            return raycaster.intersectObject(modelObject, true).find(intersection => {
+                let current = intersection.object;
+                while (current) {
+                    if (current.userData?.isCollision || current.userData?.isCollisionGeom || current.isURDFCollider) return false;
+                    current = current.parent;
+                }
+                return intersection.object.isMesh && intersection.object.visible;
+            }) || null;
+        };
+
+        canvas.addEventListener('mousemove', (event) => {
+            if (!this.measurementController?.pointMeasurementActive) return;
+            const hit = getModelHit(event);
+            this.measurementController.previewMeasurementPoint(hit?.point || null);
+        });
+
         canvas.addEventListener('mousedown', (event) => {
             if (this.endMoveControls?.active) return;
             if (event.button === 0) {
@@ -658,7 +700,7 @@ class App {
             const distance = Math.sqrt(dx * dx + dy * dy);
             const duration = Date.now() - mouseDownTime;
 
-            if (distance < 5 && duration < 300) {
+            if (distance < 8 && duration < 1200) {
                 const raycaster = new THREE.Raycaster();
                 const mouse = new THREE.Vector2();
 
@@ -667,6 +709,19 @@ class App {
                 mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
                 raycaster.setFromCamera(mouse, this.sceneManager.camera);
+                if (this.measurementController?.pointMeasurementActive) {
+                    const hit = getModelHit(event);
+                    if (hit) {
+                        this.measurementController.addMeasurementPoint(hit.point);
+                        const count = this.measurementController.pointMeasurementPoints.length;
+                        const hint = document.getElementById('measure-length-hint');
+                        if (hint) hint.textContent = count === 1
+                            ? 'First point set. Click a second point to measure.'
+                            : 'Distance shown. Click again to start a new measurement.';
+                    }
+                    mouseDownPos = null;
+                    return;
+                }
                 const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
 
                 // Check if a copied frame was clicked
@@ -724,6 +779,12 @@ class App {
 
             mouseDownPos = null;
         }, true);
+
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.measurementController?.pointMeasurementActive) {
+                document.getElementById('measure-length-btn')?.click();
+            }
+        });
     }
 
     /**

@@ -9,6 +9,38 @@ export class MeasurementController {
     constructor(sceneManager) {
         this.sceneManager = sceneManager;
         this.selectedObjects = [];
+        this.pointMeasurementActive = false;
+        this.pointMeasurementPoints = [];
+    }
+
+    setPointMeasurementActive(active) {
+        this.pointMeasurementActive = active;
+        this.pointMeasurementPoints = [];
+        this.sceneManager?.measurementManager.clearMeasurement();
+    }
+
+    addMeasurementPoint(point) {
+        if (!this.pointMeasurementActive) return;
+        if (this.pointMeasurementPoints.length === 2) this.pointMeasurementPoints = [];
+        this.pointMeasurementPoints.push(point.clone());
+        if (this.pointMeasurementPoints.length === 2) {
+            this.sceneManager.measurementManager.showPointDistance(...this.pointMeasurementPoints);
+        } else {
+            this.sceneManager.measurementManager.showPointPreview(point);
+        }
+    }
+
+    previewMeasurementPoint(point) {
+        if (!this.pointMeasurementActive) return;
+        if (this.pointMeasurementPoints.length >= 2) return;
+        if (this.pointMeasurementPoints.length === 0) {
+            if (point) this.sceneManager.measurementManager.showPointPreview(point);
+            else this.sceneManager.measurementManager.clearMeasurement();
+        } else if (point) {
+            this.sceneManager.measurementManager.showPointDistance(this.pointMeasurementPoints[0], point);
+        } else {
+            this.sceneManager.measurementManager.showPointPreview(this.pointMeasurementPoints[0]);
+        }
     }
 
     /**
@@ -123,4 +155,3 @@ export class MeasurementController {
         return this.selectedObjects;
     }
 }
-

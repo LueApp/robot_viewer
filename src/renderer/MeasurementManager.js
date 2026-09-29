@@ -9,6 +9,48 @@ export class MeasurementManager {
         this.measurementHelper = null;
     }
 
+    showPointDistance(pos1, pos2) {
+        this.clearMeasurement();
+        const group = new THREE.Group();
+        group.name = 'measurementHelper';
+        const line = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([pos1, pos2]),
+            new THREE.LineDashedMaterial({ color: 0xffff00, dashSize: 0.01, gapSize: 0.005, depthTest: false })
+        );
+        line.computeLineDistances();
+        line.renderOrder = 999;
+        group.add(line);
+        const midpoint = pos1.clone().add(pos2).multiplyScalar(0.5);
+        group.add(this.createLabel(`${(pos1.distanceTo(pos2) * 1000).toFixed(1)}mm`, midpoint, '#ffff00'));
+        const geometry = new THREE.SphereGeometry(0.01, 12, 12);
+        const material = new THREE.MeshBasicMaterial({ color: 0xffff00, depthTest: false });
+        for (const point of [pos1, pos2]) {
+            const marker = new THREE.Mesh(geometry, material);
+            marker.position.copy(point);
+            marker.renderOrder = 1000;
+            group.add(marker);
+        }
+        this.sceneManager.scene.add(group);
+        this.measurementHelper = group;
+        this.sceneManager.redraw();
+    }
+
+    showPointPreview(point) {
+        this.clearMeasurement();
+        const group = new THREE.Group();
+        group.name = 'measurementHelper';
+        const marker = new THREE.Mesh(
+            new THREE.SphereGeometry(0.014, 12, 12),
+            new THREE.MeshBasicMaterial({ color: 0x00e5ff, depthTest: false })
+        );
+        marker.position.copy(point);
+        marker.renderOrder = 1000;
+        group.add(marker);
+        this.sceneManager.scene.add(group);
+        this.measurementHelper = group;
+        this.sceneManager.redraw();
+    }
+
     /**
      * Show measurement between two objects
      * @param {THREE.Vector3} pos1 - World position of first object
@@ -227,6 +269,12 @@ export class MeasurementManager {
     clearMeasurement() {
         if (this.measurementHelper) {
             this.sceneManager.scene.remove(this.measurementHelper);
+            this.measurementHelper.traverse(object => {
+                object.geometry?.dispose();
+                if (Array.isArray(object.material)) object.material.forEach(material => material.dispose());
+                else object.material?.dispose();
+                object.material?.map?.dispose();
+            });
             this.measurementHelper = null;
             this.sceneManager.redraw();
         }
@@ -239,4 +287,3 @@ export class MeasurementManager {
         this.clearMeasurement();
     }
 }
-

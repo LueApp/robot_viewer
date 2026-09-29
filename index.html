@@ -349,6 +349,25 @@
             display: block;
         }
 
+        #canvas.measuring-length { cursor: crosshair; }
+
+        #measure-length-hint {
+            position: absolute;
+            left: 50%;
+            bottom: 24px;
+            transform: translateX(-50%);
+            z-index: 100;
+            padding: 9px 14px;
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            font-size: 13px;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
         /* Creator backlink */
         #creator-home-link {
             position: absolute;
@@ -3961,6 +3980,7 @@
                 <div class="control-bar-divider"></div>
 
                 <div class="control-bar-section">
+                    <button class="tool-button" id="measure-length-btn" type="button" aria-pressed="false" title="Click two points on the model to measure their distance">Measure length</button>
                     <button class="tool-button active" id="toggle-files-panel">
                         <span class="tool-button-text" data-i18n="files"></span>
                     </button>
@@ -4009,6 +4029,7 @@
             </div>
 
             <canvas id="canvas"></canvas>
+            <div id="measure-length-hint" role="status" aria-live="polite" hidden></div>
 
             <div id="floating-files-panel" class="floating-panel">
                 <div class="floating-panel-header">

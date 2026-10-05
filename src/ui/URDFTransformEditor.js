@@ -1,5 +1,6 @@
 import { XMLUpdater } from '../utils/XMLUpdater.js';
 import { rebaseURDFJoint } from '../utils/URDFJointZero.js';
+import { adjustURDFLinkFrame } from '../utils/URDFLinkFrame.js';
 
 /**
  * Structured editor for URDF visual/collision origins and joint frames/axes.
@@ -40,6 +41,8 @@ export class URDFTransformEditor {
         this.reverseLimitsCheckbox = document.getElementById('urdf-reverse-limits');
         this.geometryApplyButton = document.getElementById('urdf-apply-geometry');
         this.jointApplyButton = document.getElementById('urdf-apply-joint');
+        this.frameLinkSelect = document.getElementById('urdf-transform-frame-link');
+        this.frameFieldset = document.getElementById('urdf-frame-fields');
         this.zeroFields = document.getElementById('urdf-zero-fields');
         this.zeroInput = document.getElementById('urdf-zero-offset');
         this.zeroLabel = document.getElementById('urdf-zero-label');
@@ -50,6 +53,8 @@ export class URDFTransformEditor {
     setupEvents() {
         this.linkSelect?.addEventListener('change', () => {
             this.populateGeometrySelect();
+            if (this.frameLinkSelect) this.frameLinkSelect.value = this.linkSelect.value;
+            this.loadSelectedFrame(true);
             const attachedJoint = this.parsed?.joints.find(joint => joint.child === this.linkSelect.value);
             if (attachedJoint && this.jointSelect) {
                 this.jointSelect.value = attachedJoint.name;
@@ -60,6 +65,8 @@ export class URDFTransformEditor {
         this.jointSelect?.addEventListener('change', () => this.loadSelectedJoint());
         this.geometryApplyButton?.addEventListener('click', () => this.applyGeometry());
         this.jointApplyButton?.addEventListener('click', () => this.applyJoint());
+        this.frameLinkSelect?.addEventListener('change', () => this.selectLink(this.frameLinkSelect.value));
+        document.getElementById('urdf-apply-frame')?.addEventListener('click', () => this.applyFrame());
         this.zeroInput?.addEventListener('input', () => this.updateZeroPreview());
         document.getElementById('urdf-zero-current')?.addEventListener('click', () => this.useCurrentZero());
         document.getElementById('urdf-apply-zero')?.addEventListener('click', () => this.applyZero());
@@ -105,7 +112,8 @@ export class URDFTransformEditor {
             throw new Error(window.i18n.t('urdfInvalidDocument'));
         }
 
-        const links = Array.from(documentNode.getElementsByTagName('link')).map(linkElement => {
+        const robotElements = Array.from(documentNode.documentElement.children);
+        const links = robotElements.filter(element => element.localName === 'link').map(linkElement => {
             const geometries = [];
             ['visual', 'collision'].forEach(type => {
                 const elements = Array.from(linkElement.children).filter(child => child.localName === type);
@@ -131,7 +139,7 @@ export class URDFTransformEditor {
             return { name: linkElement.getAttribute('name'), geometries };
         }).filter(link => link.name);
 
-        const joints = Array.from(documentNode.getElementsByTagName('joint')).map(jointElement => {
+        const joints = robotElements.filter(element => element.localName === 'joint').map(jointElement => {
             const parent = this.directChild(jointElement, 'parent');
             const child = this.directChild(jointElement, 'child');
             const axis = this.directChild(jointElement, 'axis');
@@ -166,6 +174,7 @@ export class URDFTransformEditor {
             this.populateSelect(this.linkSelect, [], '');
             this.populateSelect(this.geometrySelect, [], '');
             this.populateSelect(this.jointSelect, [], '');
+            this.populateSelect(this.frameLinkSelect, [], '');
             this.setEditorEnabled(false);
             this.showStatus(window.i18n.t('urdfOnlyHint'), 'info');
             return;
@@ -175,6 +184,7 @@ export class URDFTransformEditor {
             const oldLink = this.linkSelect.value;
             const oldGeometry = this.geometrySelect?.value;
             const oldJoint = this.jointSelect.value;
+            const oldFrameLink = this.frameLinkSelect?.value;
             this.parsed = this.parseURDF(content);
 
             this.populateSelect(
@@ -183,6 +193,11 @@ export class URDFTransformEditor {
                 oldLink
             );
             this.populateGeometrySelect(oldGeometry);
+            this.populateSelect(
+                this.frameLinkSelect,
+                this.parsed.links.map(link => ({ value: link.name, label: link.name })),
+                oldFrameLink || oldLink
+            );
             this.populateSelect(
                 this.jointSelect,
                 this.parsed.joints.map(joint => ({
@@ -201,6 +216,7 @@ export class URDFTransformEditor {
             this.populateSelect(this.linkSelect, [], '');
             this.populateSelect(this.geometrySelect, [], '');
             this.populateSelect(this.jointSelect, [], '');
+            this.populateSelect(this.frameLinkSelect, [], '');
             this.setEditorEnabled(false);
             this.showStatus(error.message, 'error');
         }
@@ -324,6 +340,50 @@ export class URDFTransformEditor {
             && ['revolute', 'continuous', 'prismatic'].includes(joint.type);
     }
 
+    loadSelectedFrame(reset = false) {
+        const link = this.parsed?.links.find(item => item.name === this.frameLinkSelect?.value);
+        this.frameFieldset?.toggleAttribute('disabled', !this.isSupported || !link || this.isApplying);
+        if (reset) {
+            this.setVector('urdf-frame-position', [0, 0, 0]);
+            this.setVector('urdf-frame-rotation', [0, 0, 0]);
+        }
+    }
+
+    async applyFrame() {
+        if (this.isApplying) return;
+        try {
+            if (this.poseController?.liveLocked) throw new Error(window.i18n.t('urdfFrameLiveLocked'));
+            const content = this.codeEditorManager.getEditor().getValue();
+            const parsed = this.parseURDF(content);
+            const linkName = this.frameLinkSelect?.value;
+            if (!this.isSupported || !parsed.links.some(link => link.name === linkName)) {
+                throw new Error(window.i18n.t('urdfFrameSelectLink'));
+            }
+            const updated = adjustURDFLinkFrame(content, linkName, {
+                xyz: this.readVector('urdf-frame-position'),
+                rpy: this.readVector('urdf-frame-rotation')
+            });
+            if (updated === content) {
+                this.showStatus(window.i18n.t('urdfFrameNoChange'), 'info');
+                return;
+            }
+            const pose = this.poseController?.getPose();
+            if (pose) parsed.joints.filter(joint => joint.mimic).forEach(joint => delete pose[joint.name]);
+            const previousModel = this.model;
+            this.setApplying(true);
+            await this.commit(updated);
+            if (this.model === previousModel) throw new Error(window.i18n.t('reloadFailed'));
+            if (pose) this.poseController.applyPose(pose, { source: 'urdf-frame', ignoreLimits: true, applyConstraints: false });
+            this.refreshFromEditor();
+            this.loadSelectedFrame(true);
+            this.showStatus(window.i18n.t('urdfFrameApplied'), 'success');
+        } catch (error) {
+            this.showStatus(error.message, 'error');
+        } finally {
+            this.setApplying(false);
+        }
+    }
+
     useCurrentZero() {
         if (!this.zeroInput) return;
         const joint = this.parsed?.joints.find(item => item.name === this.jointSelect?.value);
@@ -412,9 +472,14 @@ export class URDFTransformEditor {
         this.geometryFieldset?.toggleAttribute('disabled', !enabled || this.isApplying);
         this.jointFieldset?.toggleAttribute('disabled', !enabled || this.isApplying);
         this.zeroFields?.toggleAttribute('disabled', !enabled || this.isApplying);
+        this.frameFieldset?.toggleAttribute('disabled', !enabled || this.isApplying);
+        if (this.frameLinkSelect) {
+            this.frameLinkSelect.disabled = !enabled || this.isApplying || !this.parsed?.links.length;
+        }
         if (enabled) {
             this.loadSelectedGeometry();
             this.loadSelectedJoint();
+            this.loadSelectedFrame();
         }
     }
 
@@ -422,8 +487,10 @@ export class URDFTransformEditor {
         this.isApplying = isApplying;
         this.geometryApplyButton?.toggleAttribute('disabled', isApplying);
         this.jointApplyButton?.toggleAttribute('disabled', isApplying);
+        if (this.frameLinkSelect) this.frameLinkSelect.disabled = isApplying || !this.parsed?.links.length;
         this.loadSelectedGeometry();
         this.loadSelectedJoint();
+        this.loadSelectedFrame();
     }
 
     async commit(updatedContent) {

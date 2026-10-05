@@ -621,7 +621,7 @@ export class ModelGraphView {
                     break;
                 case 'toggle-joint-axis':
                     if (this.sceneManager.axesManager.hasJointAxis(linkName, model)) {
-                        isActive = this.sceneManager.axesManager.isLinkJointAxisVisible(linkName);
+                        isActive = this.sceneManager.axesManager.isLinkJointAxisVisible(linkName, model);
                         item.classList.remove('disabled');
                     } else {
                         isActive = false;

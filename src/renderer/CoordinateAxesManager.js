@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isURDFLinkFrameJoint } from '../utils/URDFLinkFrame.js';
 
 /**
  * CoordinateAxesManager - Handles link coordinate axes and joint axes visualization
@@ -318,7 +319,7 @@ export class CoordinateAxesManager {
         });
 
         // Decide whether to add to scene based on current setting and per-link overrides
-        const shouldShow = this.showJointAxesEnabled || (joint.child && this.perLinkJointAxes.has(joint.child));
+        const shouldShow = this.showJointAxesEnabled || this.hasJointAxisOverride(joint);
         if (shouldShow) {
             jointObject.add(axisGroup);
             this.jointAxesHelpers.get(jointName).isAttached = true;
@@ -438,8 +439,7 @@ export class CoordinateAxesManager {
 
         // Hide all joint axes, but respect per-link overrides
         this.jointAxesHelpers.forEach((axisInfo, jointName) => {
-            const childLink = axisInfo.joint?.child;
-            const hasPerLinkOverride = childLink && this.perLinkJointAxes.has(childLink);
+            const hasPerLinkOverride = this.hasJointAxisOverride(axisInfo.joint);
 
             if (axisInfo.isAttached && axisInfo.parent && !hasPerLinkOverride) {
                 axisInfo.parent.remove(axisInfo.mesh);
@@ -485,8 +485,7 @@ export class CoordinateAxesManager {
 
         // Show axes based on global toggle and per-link overrides
         this.jointAxesHelpers.forEach((axisInfo, jointName) => {
-            const childLink = axisInfo.joint?.child;
-            const shouldShow = this.showJointAxesEnabled || (childLink && this.perLinkJointAxes.has(childLink));
+            const shouldShow = this.showJointAxesEnabled || this.hasJointAxisOverride(axisInfo.joint);
 
             if (shouldShow && !axisInfo.isAttached && axisInfo.parent) {
                 axisInfo.parent.add(axisInfo.mesh);
@@ -511,29 +510,54 @@ export class CoordinateAxesManager {
     }
 
     /**
+     * Find the link's rotation joint through older saved frame-helper joints.
+     */
+    static findLinkRotationJoint(linkName, model) {
+        if (!model?.joints) return null;
+        const parents = new Map(Array.from(model.joints.values(), joint => [joint.child, joint]));
+        const visited = new Set();
+        while (linkName && !visited.has(linkName)) {
+            visited.add(linkName);
+            const joint = parents.get(linkName);
+            if (!joint) return null;
+            if (['revolute', 'continuous'].includes(joint.type)) return joint;
+            if (!isURDFLinkFrameJoint(joint)) return null;
+            linkName = joint.parent;
+        }
+        return null;
+    }
+
+    hasJointAxisOverride(joint, model = this.sceneManager?.currentModel) {
+        if (!joint) return false;
+        for (const linkName of this.perLinkJointAxes) {
+            if (joint.child === linkName || CoordinateAxesManager.findLinkRotationJoint(linkName, model) === joint) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Toggle joint axis for a single link (the joint whose child is this link)
      */
     toggleLinkJointAxis(linkName, show, model) {
+        const joint = CoordinateAxesManager.findLinkRotationJoint(linkName, model);
+        if (!joint) return;
         if (show) {
             this.perLinkJointAxes.add(linkName);
         } else {
             this.perLinkJointAxes.delete(linkName);
         }
-        if (model && model.joints) {
-            model.joints.forEach((joint, jointName) => {
-                if (joint.child === linkName) {
-                    const axisInfo = this.jointAxesHelpers.get(jointName);
-                    if (axisInfo) {
-                        if (show && !axisInfo.isAttached && axisInfo.parent) {
-                            axisInfo.parent.add(axisInfo.mesh);
-                            axisInfo.isAttached = true;
-                        } else if (!show && !this.showJointAxesEnabled && axisInfo.isAttached && axisInfo.parent) {
-                            axisInfo.parent.remove(axisInfo.mesh);
-                            axisInfo.isAttached = false;
-                        }
-                    }
-                }
-            });
+        const axisInfo = this.jointAxesHelpers.get(joint.name);
+        if (axisInfo?.parent) {
+            const shouldShow = this.showJointAxesEnabled || this.hasJointAxisOverride(joint, model);
+            if (shouldShow && !axisInfo.isAttached) {
+                axisInfo.parent.add(axisInfo.mesh);
+                axisInfo.isAttached = true;
+            } else if (!shouldShow && axisInfo.isAttached) {
+                axisInfo.parent.remove(axisInfo.mesh);
+                axisInfo.isAttached = false;
+            }
         }
     }
 
@@ -542,21 +566,17 @@ export class CoordinateAxesManager {
         return axes ? axes.visible : false;
     }
 
-    isLinkJointAxisVisible(linkName) {
-        return this.perLinkJointAxes.has(linkName) || this.showJointAxesEnabled;
+    isLinkJointAxisVisible(linkName, model = this.sceneManager?.currentModel) {
+        const joint = CoordinateAxesManager.findLinkRotationJoint(linkName, model);
+        return Boolean(joint && (this.showJointAxesEnabled || this.hasJointAxisOverride(joint, model)));
     }
 
     /**
      * Check if a link has an associated parent joint axis
      */
     hasJointAxis(linkName, model) {
-        if (!model || !model.joints) return false;
-        for (const [jointName, joint] of model.joints) {
-            if (joint.child === linkName && this.jointAxesHelpers.has(jointName)) {
-                return true;
-            }
-        }
-        return false;
+        const joint = CoordinateAxesManager.findLinkRotationJoint(linkName, model);
+        return Boolean(joint && this.jointAxesHelpers.has(joint.name));
     }
 
     /**

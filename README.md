@@ -31,7 +31,7 @@
 - **Animation Editor (Experimental)**: Multi-clip dope sheet and Bézier graph editor with auto-key, multi-selection, undo/redo, play/record ranges, event and media tracks, pose snapshots, audio-reactive keys, live-input recording, autosave, and portable `.robotanim.json` projects
 - **Measurement Tools**: Measure distances between joints and links with 3D visualization, display X/Y/Z axis projections and total distance, support ground height measurement
 - **Code Editor**: Built-in CodeMirror editor with syntax highlighting and live preview
-- **Structured URDF Editing**: Move, rotate, scale, or mirror individual visual/collision meshes; edit joint frames or motion axes with optional limit reversal and automatic preview reload
+- **Structured URDF Editing**: Move, rotate, scale, or mirror individual visual/collision meshes; edit joint frames or motion axes, or adjust a link coordinate frame while preserving geometry and joint motion
 - **Physics Simulation**: Integrated MuJoCo engine for dynamics simulation (MJCF models)
 - **Scene Management**: File tree and scene graph visualization with hierarchical structure
 
@@ -64,6 +64,24 @@ Output will be in the `dist/` directory.
 To try structured URDF editing without external assets, load the
 [`public/examples`](public/examples) folder and select
 `urdf-transform-demo.urdf`.
+
+To correct a link coordinate system (for example, to match your DH convention),
+open **URDF Transform → Adjust link frame only** and select the link. Enter XYZ
+translation in meters and RPY rotation in radians, relative to that link's
+current coordinate frame, then click **Adjust frame only & Reload**. The mesh,
+collision geometry, inertia, and physical joint axes and motion stay the
+same, including the current pose. Each adjustment starts from the current frame;
+the offset fields reset to zero after applying. Download the edited URDF from
+the Edit panel to save it.
+
+This uses direct matrix compensation: for frame offset `D`, the incoming joint
+origin becomes `O * D`, its axis becomes `R_D^T * axis`, and visual, collision,
+inertial, and outgoing joint origins become `D^-1 * T`. Link and joint names,
+counts, connectivity, joint values, and limits remain unchanged. Revolute and
+continuous frame translations must stay on their current rotation axis;
+prismatic and fixed joints allow arbitrary translations. A root link has no
+incoming joint origin, so its frame must be changed through an external base
+pose. Unsupported adjustments report an error before changing the editor.
 
 ### Move a robot end
 

@@ -84,18 +84,9 @@ export class CopiedFrameManager {
     copyJointAxis(linkName, model) {
         if (!model || !model.joints) return;
 
-        // Find the joint whose child is this link
-        let targetJoint = null;
-        let targetJointName = null;
-        for (const [jName, joint] of model.joints) {
-            if (joint.child === linkName &&
-                (joint.type === 'revolute' || joint.type === 'continuous')) {
-                targetJoint = joint;
-                targetJointName = jName;
-                break;
-            }
-        }
+        const targetJoint = CoordinateAxesManager.findLinkRotationJoint(linkName, model);
         if (!targetJoint || !targetJoint.threeObject) return;
+        const targetJointName = targetJoint.name;
 
         // Get world transform
         const worldPos = new THREE.Vector3();

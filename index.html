@@ -3980,6 +3980,9 @@
                 <div class="control-bar-divider"></div>
 
                 <div class="control-bar-section">
+                    <button class="tool-button" id="toggle-inertia-report-panel" type="button">
+                        <span class="tool-button-text" data-i18n="inertiaReportTitle">Mass properties</span>
+                    </button>
                     <button class="tool-button" id="measure-length-btn" type="button" aria-pressed="false" title="Click two points on the model to measure their distance">Measure length</button>
                     <button class="tool-button active" id="toggle-files-panel">
                         <span class="tool-button-text" data-i18n="files"></span>
@@ -4030,6 +4033,52 @@
 
             <canvas id="canvas"></canvas>
             <div id="measure-length-hint" role="status" aria-live="polite" hidden></div>
+
+            <div id="floating-inertia-report-panel" class="floating-panel" style="display: none;">
+                <div class="floating-panel-header">
+                    <span data-i18n="inertiaReportTitle">Mass properties</span>
+                    <div>
+                        <button class="panel-maximize-btn" data-panel-id="floating-inertia-report-panel">⛶</button>
+                        <button class="panel-close-btn" data-panel="floating-inertia-report-panel">✕</button>
+                    </div>
+                </div>
+                <div class="floating-panel-content">
+                    <div class="inertia-report-actions">
+                        <button type="button" data-report-upload data-i18n="inertiaReportUpload">Upload inertia.txt</button>
+                        <button type="button" data-report-clear data-i18n="inertiaReportClear">Clear report</button>
+                        <input type="file" data-report-file accept=".txt,text/plain" hidden>
+                    </div>
+                    <div class="inertia-report-filename" data-report-filename></div>
+                    <p class="inertia-report-note" data-report-summary role="status"></p>
+                    <p class="inertia-report-note" data-report-match role="status"></p>
+                    <p data-report-error role="alert"></p>
+                    <label class="inertia-report-preview">
+                        <input type="checkbox" data-report-preview checked>
+                        <span data-i18n="inertiaReportPreview">Preview report mass, COM and inertia on matching links</span>
+                    </label>
+                    <p class="inertia-report-note" data-i18n="inertiaReportPreviewHint">Preview only; the model source is unchanged. Clear the report to restore original properties.</p>
+                    <div data-report-data hidden>
+                        <input type="search" class="inertia-report-filter" data-report-filter data-i18n="inertiaReportFilter" aria-label="Filter links">
+                        <div class="inertia-report-table-wrap">
+                            <table class="inertia-report-table">
+                                <thead><tr><th scope="col" data-i18n="inertiaReportLink">Link / coordinate system</th><th scope="col">kg</th><th scope="col">COM X (m)</th><th scope="col">COM Y (m)</th><th scope="col">COM Z (m)</th><th scope="col" data-i18n="inertiaReportModel">Model</th></tr></thead>
+                                <tbody data-report-rows></tbody>
+                            </table>
+                        </div>
+                        <p class="inertia-report-note" data-report-no-results data-i18n="inertiaReportNoResults" hidden>No matching records.</p>
+                        <div class="inertia-report-detail">
+                            <h3 data-report-selected></h3>
+                            <p><span data-i18n="inertiaReportMass">Mass</span>: <strong data-report-mass></strong></p>
+                            <p>COM (X, Y, Z): <span data-report-com></span></p>
+                            <p data-i18n="inertiaReportTensor">Inertia at COM, in the link frame (kg · m²)</p>
+                            <table class="inertia-report-table" aria-label="Inertia tensor at center of mass">
+                                <thead><tr><th></th><th scope="col">X</th><th scope="col">Y</th><th scope="col">Z</th></tr></thead>
+                                <tbody data-report-tensor></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div id="floating-files-panel" class="floating-panel">
                 <div class="floating-panel-header">

@@ -261,6 +261,7 @@ export class PanelManager {
         this.registerPanel('floating-files-panel');
         this.registerPanel('floating-joints-panel');
         this.registerPanel('floating-gravity-panel');
+        this.registerPanel('floating-inertia-report-panel');
         this.registerPanel('floating-model-tree');
         this.registerPanel('floating-urdf-transform-panel');
         this.registerPanel('floating-help-panel');

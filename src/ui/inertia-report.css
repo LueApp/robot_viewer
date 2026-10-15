@@ -1,0 +1,51 @@
+#floating-inertia-report-panel {
+    top: 110px;
+    right: 24px;
+    width: 690px;
+    height: min(720px, calc(100vh - 140px));
+    max-height: calc(100vh - 40px);
+}
+#floating-inertia-report-panel .floating-panel-content { padding: 16px; overflow: auto; }
+.inertia-report-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.inertia-report-actions button, .inertia-report-link {
+    color: var(--text-primary);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 7px;
+    padding: 7px 10px;
+    cursor: pointer;
+    font: inherit;
+}
+.inertia-report-actions button:first-child { background: var(--accent); color: white; }
+.inertia-report-actions button:disabled { opacity: 0.45; cursor: default; }
+.inertia-report-filename { font-weight: 600; overflow-wrap: anywhere; }
+.inertia-report-note { color: var(--text-tertiary); font-size: 11px; line-height: 1.6; margin: 8px 0; }
+.inertia-report-preview { display: flex; align-items: center; gap: 6px; margin: 12px 0; font-size: 12px; }
+.inertia-report-preview input { accent-color: var(--accent); }
+[data-report-error] { color: #ff6961; font-size: 12px; overflow-wrap: anywhere; }
+[data-report-error]:empty { display: none; }
+.inertia-report-filter {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 8px;
+    margin: 8px 0;
+    color: var(--text-primary);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 7px;
+}
+.inertia-report-table-wrap { max-height: 260px; overflow: auto; border: 1px solid var(--glass-border); border-radius: 8px; }
+.inertia-report-table { border-collapse: collapse; width: 100%; font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.inertia-report-table th, .inertia-report-table td { padding: 7px 9px; text-align: right; border-bottom: 1px solid var(--glass-border); }
+.inertia-report-table thead th { position: sticky; top: 0; background: var(--bg-primary); z-index: 1; }
+.inertia-report-table th:first-child, .inertia-report-table td:first-child { text-align: left; }
+.inertia-report-table tr.selected { background: var(--accent-secondary); }
+.inertia-report-table .inertia-report-link { border: 0; background: none; padding: 2px 0; text-align: left; }
+.inertia-report-link:hover, .inertia-report-link:focus-visible { color: var(--accent); }
+.inertia-report-detail { margin-top: 14px; padding: 12px; background: var(--accent-secondary); border-radius: 10px; }
+.inertia-report-detail h3 { margin: 0 0 10px; font-size: 13px; overflow-wrap: anywhere; }
+.inertia-report-detail p { margin: 6px 0; font-size: 12px; }
+.inertia-report-detail .inertia-report-table { max-width: 450px; margin-top: 6px; }
+@media (max-width: 740px) {
+    #floating-inertia-report-panel { right: 20px; top: 80px; width: calc(100vw - 40px); height: calc(100vh - 100px); }
+}

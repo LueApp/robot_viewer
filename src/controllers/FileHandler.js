@@ -72,6 +72,11 @@ export class FileHandler {
      * Handle file drop
      */
     async handleDrop(e) {
+        const droppedFiles = Array.from(e.dataTransfer.files || []);
+        if (droppedFiles.length === 1 && /\.txt$/i.test(droppedFiles[0].name) && this.onInertiaReport) {
+            await this.onInertiaReport(droppedFiles[0]);
+            return;
+        }
         const items = e.dataTransfer.items;
         if (!items || items.length === 0) return;
 
@@ -552,4 +557,3 @@ export class FileHandler {
         return this.currentModelFile;
     }
 }
-

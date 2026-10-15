@@ -428,6 +428,7 @@ export class UIController {
             'floating-joints-panel': 'toggle-joints-panel',
             'floating-model-tree': 'toggle-model-tree',
             'floating-urdf-transform-panel': 'toggle-urdf-transform-panel',
+            'floating-inertia-report-panel': 'toggle-inertia-report-panel',
             'floating-help-panel': 'help-button'
         };
 

@@ -66,22 +66,31 @@ export class InertialVisualization {
     }
 
     /**
+     * Release auxiliary GPU resources before rebuilding a report preview.
+     */
+    disposeVisualizations() {
+        const geometries = new Set();
+        const materials = new Set();
+        for (const object of [...this.comMarkers.values(), ...this.inertiaEllipsoids.values()]) {
+            object.removeFromParent();
+            object.traverse(child => {
+                if (child.geometry) geometries.add(child.geometry);
+                for (const material of [child.material, child.__origMaterial].flat()) {
+                    if (material) materials.add(material);
+                }
+            });
+        }
+        geometries.forEach(geometry => geometry.dispose());
+        materials.forEach(material => material.dispose());
+        this.comMarkers.clear();
+        this.inertiaEllipsoids.clear();
+    }
+
+    /**
      * Extract and visualize inertial properties from model
      */
     extractInertialProperties(model) {
-        // Clean up: remove from parent objects
-        this.comMarkers.forEach(marker => {
-            if (marker.parent) {
-                marker.parent.remove(marker);
-            }
-        });
-        this.inertiaEllipsoids.forEach(ellipsoid => {
-            if (ellipsoid.parent) {
-                ellipsoid.parent.remove(ellipsoid);
-            }
-        });
-        this.comMarkers = new Map();
-        this.inertiaEllipsoids = new Map();
+        this.disposeVisualizations();
 
         if (!model.links) {
             return;
@@ -117,8 +126,8 @@ export class InertialVisualization {
                 this.createCOMMarker(model, link, comPosition);
             }
 
-            // Create inertia box only when global toggle is on
-            if (this.showInertia && (inertial.ixx !== undefined || inertial.inertia)) {
+            // Preserve per-link visibility when report properties are refreshed.
+            if ((this.showInertia || this.perLinkInertia.has(name)) && (inertial.ixx !== undefined || inertial.inertia)) {
                 this.createInertiaEllipsoid(model, link, comPosition, inertial);
             }
         });
@@ -460,16 +469,8 @@ export class InertialVisualization {
      * Clear all inertial visualizations
      */
     clear() {
-        this.comMarkers.forEach(marker => {
-            if (marker.parent) marker.parent.remove(marker);
-        });
-        this.inertiaEllipsoids.forEach(ellipsoid => {
-            if (ellipsoid.parent) ellipsoid.parent.remove(ellipsoid);
-        });
-        this.comMarkers = new Map();
-        this.inertiaEllipsoids = new Map();
+        this.disposeVisualizations();
         this.perLinkCOM.clear();
         this.perLinkInertia.clear();
     }
 }
-

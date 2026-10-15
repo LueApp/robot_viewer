@@ -83,6 +83,28 @@ prismatic and fixed joints allow arbitrary translations. A root link has no
 incoming joint origin, so its frame must be changed through an external base
 pose. Unsupported adjustments report an error before changing the editor.
 
+### Upload mass properties from inertia.txt
+
+Open **Mass properties → Upload inertia.txt**, or drop a `.txt` report into the
+viewer. SolidWorks mass-properties reports like `inertia_1014.txt` are supported,
+including Chinese/English labels and multiple named coordinate systems. You can
+inspect the report without loading a robot: filter the link list, select a record,
+and view its mass, COM coordinates and full inertia matrix. Values are displayed
+in kg, m and kg · m²; g, cm and mm report units are converted automatically.
+
+With a URDF/Xacro loaded, coordinate-system names match link names exactly. The
+preview checkbox applies report properties to matching links and shows their COM
+markers and inertia boxes in the current pose. The panel reports matched and
+unmatched records separately, with both report and matched mass totals. Imported
+properties also appear in the link hover and gravity displays. The COM tensor
+(`Lxx…Lzz`) is used with its reported signs, rather than the tensor about the
+output origin (`Ixx…Izz`). The report coordinate systems must represent the same
+local frames as the named links.
+
+Importing changes the in-memory preview only. Unchecking the preview or clearing
+the report restores the model's original properties; the URDF source and downloads
+are unchanged. UTF-8, BOM-marked UTF-16 and GB18030 text exports are supported.
+
 ### Move a robot end
 
 Load a URDF, Xacro, or MJCF robot, then click **Move end** in the Joints panel.

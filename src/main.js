@@ -11,6 +11,7 @@ import { JointControlsUI } from './ui/JointControlsUI.js';
 import { EndMoveControls } from './ui/EndMoveControls.js';
 import { URDFTransformEditor } from './ui/URDFTransformEditor.js';
 import { GravityCompensationUI } from './ui/GravityCompensationUI.js';
+import { InertiaReportPanel } from './ui/InertiaReportPanel.js';
 import { PanelManager } from './ui/PanelManager.js';
 import { ModelGraphView } from './views/ModelGraphView.js';
 import { FileTreeView } from './views/FileTreeView.js';
@@ -166,6 +167,9 @@ class App {
             // so UIController/onMeasurementUpdate can reach it)
             this.gravityUI = new GravityCompensationUI(this.sceneManager);
             this.sceneManager.gravityUI = this.gravityUI;
+
+            this.inertiaReportPanel = new InertiaReportPanel(this);
+            this.fileHandler.onInertiaReport = file => this.inertiaReportPanel.loadFile(file);
 
             // Initialize model graph view
             this.modelGraphView = new ModelGraphView(this.sceneManager);
@@ -348,6 +352,7 @@ class App {
      * Handle model loaded
      */
     async handleModelLoaded(model, file, isMesh = false, snapshot = null) {
+        this.inertiaReportPanel?.setModel(null);
         this.urdfTransformEditor?.setModel(model, file);
 
         // Check if MJCF file (show simulation controls, don't auto-start simulation)
@@ -546,6 +551,7 @@ class App {
 
         // Add to scene (render in background under snapshot)
         this.sceneManager.addModel(model);
+        this.inertiaReportPanel?.setModel(isMesh ? null : model);
         this.endMoveControls?.setModel(isMesh ? null : model);
 
         // Hide drop zone
@@ -1079,6 +1085,7 @@ class App {
     handleLanguageChanged(lang) {
         i18n.setLanguage(lang);
         this.animationWorkspace?.refreshLanguage();
+        this.inertiaReportPanel?.render();
 
         // Update code editor save status text
         if (this.codeEditorManager) {

@@ -258,6 +258,65 @@ export class UIController {
             vectorInputNotification.hidden = false;
         };
 
+        const getExportPose = () => {
+            const pose = this.onGetCurrentPose?.();
+            if (!pose) {
+                showVectorNotification(window.i18n.t('poseExportNoJoints'));
+                return null;
+            }
+            if (!pose.positions.every(Number.isFinite)) {
+                showVectorNotification(window.i18n.t('vectorInvalid'));
+                return null;
+            }
+            return pose;
+        };
+
+        document.getElementById('copy-pose-btn')?.addEventListener('click', async () => {
+            const pose = getExportPose();
+            if (!pose) return;
+
+            const text = JSON.stringify(pose.positions);
+            if (vectorInputField) {
+                vectorInputField.value = text;
+                vectorInputField.focus();
+                vectorInputField.select();
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                showVectorNotification(window.i18n.t('poseCopied')
+                    .replace('{rotation}', pose.units.rotation)
+                    .replace('{translation}', pose.units.translation));
+            } catch {
+                showVectorNotification(window.i18n.t('poseCopyFallback'));
+                const fallback = document.createElement('textarea');
+                fallback.className = 'pose-copy-fallback';
+                fallback.value = text;
+                fallback.readOnly = true;
+                fallback.rows = 2;
+                fallback.setAttribute('aria-label', window.i18n.t('copyPose'));
+                vectorInputNotification?.querySelector('.vector-input-notification-message')?.appendChild(fallback);
+                fallback.focus();
+                fallback.select();
+            }
+        });
+
+        document.getElementById('export-pose-btn')?.addEventListener('click', () => {
+            const pose = getExportPose();
+            if (!pose) return;
+
+            const blob = new Blob([JSON.stringify(pose, null, 2) + '\n'], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            const safeName = pose.model.replace(/[^a-z0-9_-]+/gi, '-');
+            anchor.download = `${safeName || 'robot'}.pose.json`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 0);
+            showVectorNotification(window.i18n.t('poseExported'));
+        });
+
         const applyVector = () => {
             if (!vectorInputField) return;
 
@@ -694,6 +753,7 @@ export class UIController {
     setupAll(callbacks = {}) {
         // Save all callbacks (before setupControlPanel)
         this.onAngleUnitChanged = callbacks.onAngleUnitChanged;
+        this.onGetCurrentPose = callbacks.onGetCurrentPose;
         this.onIgnoreLimitsChanged = callbacks.onIgnoreLimitsChanged;
         this.onResetJoints = callbacks.onResetJoints;
         this.onVectorInput = callbacks.onVectorInput;

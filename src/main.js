@@ -205,6 +205,7 @@ class App {
                 onLanguageChanged: (lang) => this.handleLanguageChanged(lang),
                 onResetJoints: () => this.handleResetJoints(),
                 onVectorInput: (text, options) => this.handleVectorInput(text, options),
+                onGetCurrentPose: () => this.jointControlsUI.getCurrentPose(this.currentModel),
                 onMujocoReset: () => this.handleMujocoReset(),
                 onMujocoToggleSimulate: () => this.handleMujocoToggleSimulate()
             });

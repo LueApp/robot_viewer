@@ -734,6 +734,34 @@ export class JointControlsUI {
         }
     }
 
+    /** Capture the current pose in control order and display units. */
+    getCurrentPose(model) {
+        if (!model?.joints) return null;
+
+        const jointNames = [];
+        const positions = [];
+        model.joints.forEach((joint, name) => {
+            if (joint.type === 'fixed') return;
+            jointNames.push(name);
+            // URDF mimic joints can move without updating the unified model's cache.
+            const value = joint.threeObject?.isURDFJoint
+                ? joint.threeObject.angle
+                : joint.currentValue ?? 0;
+            positions.push(this.toDisplayValue(joint, value));
+        });
+        if (!jointNames.length) return null;
+
+        return {
+            model: model.name || 'robot',
+            units: {
+                rotation: this.angleUnit === 'deg' ? 'deg' : 'rad',
+                translation: this.angleUnit === 'deg' ? 'mm' : 'm'
+            },
+            jointNames,
+            positions
+        };
+    }
+
     /**
      * Set all joints from a vector of values (in display unit)
      * @param {UnifiedRobotModel} model
@@ -799,9 +827,7 @@ export class JointControlsUI {
 
         // Apply values
         controllableJoints.forEach(({ name, joint }, i) => {
-            let valueInRad = this.angleUnit === 'deg'
-                ? values[i] * Math.PI / 180
-                : values[i];
+            const valueInRad = this.fromDisplayValue(joint, values[i]);
 
             ModelLoaderFactory.setJointAngle(model, name, valueInRad);
             joint.currentValue = valueInRad;

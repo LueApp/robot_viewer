@@ -2463,8 +2463,46 @@
             align-items: center;
         }
 
+        .pose-export-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 7px;
+        }
+
+        .pose-export-actions button {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-primary);
+            font: inherit;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .pose-export-actions button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .pose-copy-fallback {
+            box-sizing: border-box;
+            display: block;
+            width: 100%;
+            margin-top: 6px;
+            padding: 6px;
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-primary);
+            font-family: monospace;
+            resize: vertical;
+        }
+
         #vector-input-field {
             flex: 1;
+            min-width: 0;
             padding: 6px 10px;
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -4114,6 +4152,10 @@
                     <div class="vector-input-row">
                         <input type="text" id="vector-input-field" data-i18n="vectorInputPlaceholder" autocomplete="off" spellcheck="false">
                         <button id="vector-apply-btn" data-i18n="vectorApply"></button>
+                    </div>
+                    <div class="pose-export-actions">
+                        <button id="copy-pose-btn" type="button" data-i18n="copyPose">Copy pose</button>
+                        <button id="export-pose-btn" type="button" data-i18n="exportPose">Export pose</button>
                     </div>
                     <div id="vector-input-notification" role="alert" aria-live="polite" hidden></div>
                 </div>

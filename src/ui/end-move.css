@@ -10,8 +10,7 @@
 #end-move-controls[hidden], #end-move-vector-row[hidden] { display: none; }
 
 #floating-joints-panel.end-move-active #joint-controls,
-#floating-joints-panel.end-move-active #vector-input-area .vector-input-row,
-#floating-joints-panel.end-move-active #vector-input-notification { display: none; }
+#floating-joints-panel.end-move-active #vector-input-area .vector-input-row { display: none; }
 
 #toggle-end-move { width: 100%; margin-bottom: 7px; }
 

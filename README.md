@@ -122,6 +122,23 @@ they do not represent actuator torque limits.
 End movement currently supports serial joint chains; closed-chain constraints
 and the separate USD viewer are not supported.
 
+### Export the current joint pose
+
+In the **Joints** panel, click **Copy pose** to copy the current joint positions
+as a vector, or **Export pose** to download `<robot-name>.pose.json` with the
+model name, joint names, positions and units. Both use the joint-control order
+and current unit selection: **Radian** uses radians/meters; **Degree** uses
+degrees/millimeters. Fixed joints are omitted. Values are captured from the
+current model without display rounding, including poses set by dragging,
+**Move end**, animation or live simulation.
+
+To restore a copied pose, select the same units, paste the vector into the joint
+input field and click **Apply**. The JSON file's `positions` array can also be
+pasted into that field for the same model and joint order. If clipboard access
+is unavailable, **Copy pose** displays and selects the vector for manual copying.
+
+### Adjust a joint's zero
+
 To recalibrate a motor's zero, click **Set zero** beside its joint name (or open
 **URDF Transform → Adjust joint zero**). Enter the old angle that should become
 zero, in degrees, or click **Use current pose**, then **Set zero & Reload**.

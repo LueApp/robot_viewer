@@ -160,6 +160,12 @@ export const translations = {
         'vectorAppendZeros': '末尾补 0',
         'vectorInvalid': '向量中包含无效数值',
         'vectorApplied': '已应用关节向量',
+        'copyPose': '复制姿态',
+        'exportPose': '导出姿态',
+        'poseExportNoJoints': '请先加载包含可控关节的模型。',
+        'poseCopied': '已复制当前姿态（{rotation} / {translation}）。可粘贴到关节向量输入框中恢复。',
+        'poseCopyFallback': '剪贴板不可用。请按 Ctrl/Cmd+C 复制下方已选中的姿态向量。',
+        'poseExported': '已导出姿态 JSON，包含关节名称、位置和单位。',
         'cancel': '取消',
 
         // MuJoCo 仿真
@@ -505,6 +511,12 @@ export const translations = {
         'vectorAppendZeros': 'Append zeros',
         'vectorInvalid': 'Vector contains invalid values',
         'vectorApplied': 'Joint vector applied',
+        'copyPose': 'Copy pose',
+        'exportPose': 'Export pose',
+        'poseExportNoJoints': 'Load a model with controllable joints first.',
+        'poseCopied': 'Current pose copied ({rotation} / {translation}). Paste into the joint vector field to restore it.',
+        'poseCopyFallback': 'Clipboard unavailable. Press Ctrl/Cmd+C to copy the selected pose vector below.',
+        'poseExported': 'Pose JSON exported with joint names, positions and units.',
         'cancel': 'Cancel',
 
         // MuJoCo simulation

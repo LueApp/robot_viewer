@@ -28,6 +28,7 @@
 - **Robot Types**: Serial robot structures (parallel robots not currently supported)
 - **Visualization Tools**: Visual/collision geometry, inertia tensors, center of mass, coordinate frames, joint axes, shadows, ground grid visibility, coordinate system orientation
 - **Interactive Controls**: Drag joints in real-time, adjust model poses
+- **Automatic Joint Limit Repair**: URDF/Xacro revolute and prismatic joints with `lower > upper` use swapped bounds for viewing and movement. Corrections apply to the loaded model; the source file stays unchanged.
 - **Animation Editor (Experimental)**: Multi-clip dope sheet and Bézier graph editor with auto-key, multi-selection, undo/redo, play/record ranges, event and media tracks, pose snapshots, audio-reactive keys, live-input recording, autosave, and portable `.robotanim.json` projects
 - **Measurement Tools**: Measure distances between joints and links with 3D visualization, display X/Y/Z axis projections and total distance, support ground height measurement
 - **Code Editor**: Built-in CodeMirror editor with syntax highlighting and live preview

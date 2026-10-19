@@ -55,6 +55,23 @@ export class URDFAdapter {
             this.supplementJointLimitsFromXML(model, urdfXML);
         }
 
+        // Normalize after XML supplementation so it cannot restore reversed bounds.
+        // Keep the controls and urdf-loader's motion constraints in sync.
+        model.joints.forEach(joint => {
+            if (joint.type !== 'revolute' && joint.type !== 'prismatic') return;
+            if (!joint.limits) return;
+
+            const { lower, upper } = joint.limits;
+            if (!Number.isFinite(lower) || !Number.isFinite(upper) || lower <= upper) return;
+
+            joint.limits.lower = upper;
+            joint.limits.upper = lower;
+            if (joint.threeObject?.limit) {
+                joint.threeObject.limit.lower = upper;
+                joint.threeObject.limit.upper = lower;
+            }
+        });
+
         // Find root link (link that is not a child of any joint)
         const allChildren = new Set(
             Array.from(model.joints.values()).map(j => j.child).filter(c => c)

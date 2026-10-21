@@ -335,12 +335,11 @@ export class URDFAdapter {
                 rpy: inertial.origin.rpy || [0, 0, 0]
             };
         }
-        if (inertial.ixx !== undefined) props.ixx = inertial.ixx;
-        if (inertial.iyy !== undefined) props.iyy = inertial.iyy;
-        if (inertial.izz !== undefined) props.izz = inertial.izz;
-        if (inertial.ixy !== undefined) props.ixy = inertial.ixy;
-        if (inertial.ixz !== undefined) props.ixz = inertial.ixz;
-        if (inertial.iyz !== undefined) props.iyz = inertial.iyz;
+        // urdf-loader stores the tensor under `inertia`; older callers use flat fields.
+        const tensor = inertial.inertia ?? inertial;
+        for (const component of ['ixx', 'iyy', 'izz', 'ixy', 'ixz', 'iyz']) {
+            if (tensor[component] !== undefined) props[component] = tensor[component];
+        }
         return props;
     }
 
@@ -475,4 +474,3 @@ export class URDFAdapter {
         }
     }
 }
-

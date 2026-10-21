@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { ModelLoaderFactory } from '../loaders/ModelLoaderFactory.js';
 import { readFileContent, getFileFromEntry, getFileTypeFromExtension, getFileDisplayType } from '../utils/FileUtils.js';
+import { supportsUSD, isUSDFile } from '../config/features.js';
 
 export class FileHandler {
     constructor() {
@@ -194,8 +195,11 @@ export class FileHandler {
      * Find all loadable files
      */
     async findAllLoadableFiles(files) {
+        if (!supportsUSD && files.length && files.every(file => isUSDFile(file.name))) {
+            alert(window.i18n.t('offlineUsdUnavailable'));
+        }
         const supportedExtensions = {
-            model: ['urdf', 'xacro', 'xml', 'usd', 'usda', 'usdc', 'usdz'],
+            model: ['urdf', 'xacro', 'xml', ...(supportsUSD ? ['usd', 'usda', 'usdc', 'usdz'] : [])],
             mesh: ['dae', 'stl', 'obj', 'collada']
         };
         const loadableFiles = [];
@@ -280,6 +284,10 @@ export class FileHandler {
      * Load model file
      */
     async loadFile(file) {
+        if (!supportsUSD && isUSDFile(file.name)) {
+            alert(window.i18n.t('offlineUsdUnavailable'));
+            return;
+        }
         this.currentModelFile = file;
 
         try {

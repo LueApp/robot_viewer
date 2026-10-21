@@ -54,6 +54,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: robot-viewer-${{ github.event.release.tag_name }}.zip
+          files: |
+            robot-viewer-${{ github.event.release.tag_name }}.zip
+            dist/downloads/robot-viewer-offline.html
           overwrite: true
-

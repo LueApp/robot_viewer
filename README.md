@@ -60,7 +60,59 @@ Build for production:
 pnpm run build
 ```
 
-Output will be in the `dist/` directory.
+Output will be in the `dist/` directory, including the standalone HTML at
+`dist/downloads/robot-viewer-offline.html`. The website's **Help/About → Download
+offline HTML** button downloads this file. Each production build regenerates it
+from the same sources as the website.
+
+### Single-file offline HTML
+
+Run `npm run build:offline-html` to create
+`build/offline/robot-viewer-1.3.0-offline.html`. Copy that one file and open it
+directly in Chrome; no server, Node.js, installation or internet access is
+needed on the viewing machine. The app, styles, physics engine and licenses
+are embedded. Click **Offline HTML** in the lower-left corner for instructions
+and built-in URDF, Xacro and MJCF sample robots.
+
+USD is excluded from this edition. External requests and live connections are
+blocked. Select the complete model folder to supply local meshes, textures and
+Xacro includes. Export edited models and animations to keep portable copies;
+browser autosave may depend on the HTML file's location and browser settings.
+The website's Help/About panel provides a direct download of this edition.
+
+Test the direct-file build with Node.js 22+ and Chrome:
+`node tests/offline/browser-smoke.mjs build/offline/robot-viewer-1.3.0-offline.html`.
+The test copies only the HTML into a new folder, opens it through `file://`,
+and checks loading, physics, exports, reload and network restrictions.
+Add `--site=dist` after a production build to also test the Help/About download
+button and verify that it serves the same standalone HTML.
+
+### Local offline ZIP test package (includes USD)
+
+On Linux x64, run `npm run build:offline` to create a test ZIP under
+`build/offline/`. It includes the built viewer, USD dependencies, sample models,
+a loopback-only server, and the current Node.js runtime. Extract the ZIP and run
+`sh start.sh` inside it; no dependency installation or internet access is needed
+on a compatible Linux x64 machine. Keep the terminal open while using the viewer.
+See the included `README.txt` for the manual testing steps.
+
+The offline server blocks external assets and WebSockets through browser policy;
+live connections and external website links are disabled in this test package.
+It supplies the isolation headers required by USD. These restrictions apply to
+the viewer, not the entire browser or computer. All robot assets must be local.
+The website download button provides the standalone HTML edition; this ZIP is
+an alternative test package for users who need USD support.
+
+For a machine with Node.js already installed, build a smaller source package
+with `npm run build:offline -- --source-only`. Bundling the Linux runtime needs
+its license at `/usr/share/doc/nodejs/LICENSE`, or set `OFFLINE_NODE_LICENSE` to
+the corresponding license file. Build dependencies and the `zip` utility must
+already be installed on the build machine.
+
+Run `npm run test:offline` for server boundary checks. With Node.js 22+, Chrome
+and `unzip`, run `node tests/offline/browser-smoke.mjs <package.zip>` to test the
+extracted launcher, model formats, physics and browser network restrictions.
+Set `CHROME_PATH` if Chrome is not at `/usr/bin/google-chrome`.
 
 To try structured URDF editing without external assets, load the
 [`public/examples`](public/examples) folder and select

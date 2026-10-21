@@ -7,7 +7,10 @@
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/build-site.mjs",
+    "build:offline": "node scripts/build-offline.mjs",
+    "build:offline-html": "node scripts/build-offline-html.mjs",
+    "test:offline": "node --test tests/offline/server.test.js",
     "preview": "vite preview",
     "test": "node --test tests/animation/*.test.js tests/urdf/*.test.js tests/kinematics/*.test.js"
   },

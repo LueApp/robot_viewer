@@ -3,6 +3,8 @@
  * Responsible for displaying and managing file tree structure
  */
 
+import { supportsUSD, isUSDFile } from '../config/features.js';
+
 export class FileTreeView {
     constructor() {
         this.availableModels = [];
@@ -136,7 +138,7 @@ export class FileTreeView {
         input.style.display = 'none';
 
         if (!isFolder) {
-            input.setAttribute('accept', '.urdf,.xacro,.xml,.dae,.stl,.obj,.collada,.usd,.usda,.usdc,.usdz');
+            input.setAttribute('accept', '.urdf,.xacro,.xml,.dae,.stl,.obj,.collada' + (supportsUSD ? ',.usd,.usda,.usdc,.usdz' : ''));
         }
 
         input.addEventListener('change', (e) => {
@@ -285,6 +287,7 @@ export class FileTreeView {
         const fileStructure = {};
 
         fileMap.forEach((file, path) => {
+            if (!supportsUSD && isUSDFile(file.name)) return;
             const ext = file.name.split('.').pop().toLowerCase();
             const supportedExtensions = ['urdf', 'xacro', 'xml', 'dae', 'stl', 'obj', 'collada', 'usd', 'usda', 'usdc'];
 
@@ -455,4 +458,3 @@ export class FileTreeView {
         return item;
     }
 }
-

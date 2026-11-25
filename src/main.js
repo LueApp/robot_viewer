@@ -7,6 +7,8 @@ import * as d3 from 'd3';
 import { SceneManager } from './renderer/SceneManager.js';
 import { UIController } from './ui/UIController.js';
 import { FileHandler } from './controllers/FileHandler.js';
+import { URDFComparison } from './ui/URDFComparison.js';
+import { ComparisonPoseControls } from './ui/ComparisonPoseControls.js';
 import { JointControlsUI } from './ui/JointControlsUI.js';
 import { EndMoveControls } from './ui/EndMoveControls.js';
 import { URDFTransformEditor } from './ui/URDFTransformEditor.js';
@@ -143,6 +145,7 @@ class App {
             // Initialize file handler
             this.fileHandler = new FileHandler();
             this.fileHandler.setupFileDrop();
+            this.urdfComparison = new URDFComparison(this.sceneManager, this.fileHandler);
 
             // Set USD viewer lazy loading
             this.fileHandler.setUSDViewerInitializer(async () => {
@@ -155,13 +158,12 @@ class App {
                 }
             };
 
-            this.fileHandler.onModelLoaded = (model, file, isMesh = false, snapshot = null) => {
-                this.handleModelLoaded(model, file, isMesh, snapshot);
-            };
+            this.fileHandler.onModelLoaded = (...args) => this.handleModelLoaded(...args);
 
             // Initialize joint controls UI
             this.jointControlsUI = new JointControlsUI(this.sceneManager);
             this.jointControlsUI.setPoseController(this.poseController);
+            this.comparisonPoseControls = new ComparisonPoseControls(this.sceneManager, this.poseController, this.jointControlsUI);
 
             // Initialize gravity-compensation display (attached to sceneManager
             // so UIController/onMeasurementUpdate can reach it)
@@ -352,7 +354,11 @@ class App {
     /**
      * Handle model loaded
      */
-    async handleModelLoaded(model, file, isMesh = false, snapshot = null) {
+    async handleModelLoaded(model, file, isMesh = false, snapshot = null, { referenceFile, keepReference = false } = {}) {
+        const isURDF = model.threeObject?.isURDFRobot && /\.urdf$/i.test(file.name);
+        const waitingForPrimary = !this.urdfComparison.primary && this.urdfComparison.referenceSources.length > 0;
+        const keepComparison = Boolean(isURDF && !referenceFile && (keepReference || this._isReloading || waitingForPrimary));
+        this.urdfComparison.setPrimary(isURDF ? file : null, this.fileHandler.getFileMap(), keepComparison);
         this.inertiaReportPanel?.setModel(null);
         this.urdfTransformEditor?.setModel(model, file);
 
@@ -469,7 +475,7 @@ class App {
 
         // Clear old model
         if (this.currentModel) {
-            this.sceneManager.removeModel(this.currentModel);
+            this.sceneManager.removeModel(this.currentModel, keepComparison);
             this.currentModel = null;
         }
 
@@ -552,6 +558,7 @@ class App {
 
         // Add to scene (render in background under snapshot)
         this.sceneManager.addModel(model);
+        if (isURDF) this.urdfComparison.attachStagedReference();
         this.inertiaReportPanel?.setModel(isMesh ? null : model);
         this.endMoveControls?.setModel(isMesh ? null : model);
 
@@ -655,6 +662,10 @@ class App {
 
         // Update model info
         this.updateModelInfo(model, file);
+        if (referenceFile) {
+            const source = this.urdfComparison.sources.find(entry => entry.file === referenceFile);
+            if (source) await this.urdfComparison.load(source);
+        }
     }
 
     /**
@@ -665,7 +676,7 @@ class App {
         let mouseDownTime = 0;
 
         const getModelHit = (event) => {
-            const modelObject = this.sceneManager?.currentModel?.threeObject;
+            const modelObject = this.sceneManager?.modelAtCanvasX(event.clientX)?.threeObject;
             if (!modelObject) return null;
             const rect = canvas.getBoundingClientRect();
             const mouse = new THREE.Vector2(
@@ -729,6 +740,10 @@ class App {
                     mouseDownPos = null;
                     return;
                 }
+                if (this.sceneManager.modelAtCanvasX(event.clientX) !== this.currentModel) {
+                    mouseDownPos = null;
+                    return;
+                }
                 const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
 
                 // Check if a copied frame was clicked
@@ -756,7 +771,7 @@ class App {
                     if (obj.userData && obj.userData.isCopiedFrame) return false;
                     let current = obj;
                     while (current) {
-                        if (current.userData && current.userData.isCopiedFrame) return false;
+                        if (current === this.sceneManager.comparisonOverlay?.root || current.userData?.isCopiedFrame) return false;
                         const name = current.name || '';
                         if (name.includes('jointAxis') || name.includes('helper') ||
                             name.includes('grid') || name.includes('Ground') ||
@@ -799,7 +814,8 @@ class App {
      */
     setupCanvasContextMenu(canvas) {
         canvas.addEventListener('contextmenu', (event) => {
-            if (!this.sceneManager || !this.sceneManager.currentModel || !this.modelGraphView) return;
+            if (!this.sceneManager?.currentModel || !this.modelGraphView) return;
+            if (this.sceneManager.modelAtCanvasX(event.clientX) !== this.currentModel) return;
 
             const raycaster = new THREE.Raycaster();
             const mouse = new THREE.Vector2();
@@ -939,18 +955,19 @@ class App {
      * Handle file click
      */
     handleFileClick(fileInfo) {
+        const file = this.fileHandler.getFileMap().get(fileInfo.path) || fileInfo.file;
         const ext = fileInfo.ext;
         const modelExts = ['urdf', 'xacro', 'xml', 'usd', 'usda', 'usdc', 'usdz'];
         const meshExts = ['dae', 'stl', 'obj', 'collada'];
 
         if (modelExts.includes(ext)) {
             // Robot model file, load model and load into editor
-            this.fileHandler.loadFile(fileInfo.file);
+            this.fileHandler.loadFile(file);
 
             // If editor is open, auto-load file into editor
             const editorPanel = document.getElementById('code-editor-panel');
             if (editorPanel && editorPanel.classList.contains('visible') && this.codeEditorManager) {
-                this.codeEditorManager.loadFile(fileInfo.file);
+                this.codeEditorManager.loadFile(file);
             }
         } else if (meshExts.includes(ext)) {
             // Mesh file, load as standalone model only, don't load into editor
@@ -1047,6 +1064,7 @@ class App {
         this.angleUnit = unit;
         if (this.jointControlsUI) {
             this.jointControlsUI.setAngleUnit(unit);
+            this.comparisonPoseControls?.refresh();
         }
     }
 
@@ -1085,6 +1103,7 @@ class App {
      */
     handleLanguageChanged(lang) {
         i18n.setLanguage(lang);
+        this.comparisonPoseControls?.refresh();
         this.animationWorkspace?.refreshLanguage();
         this.inertiaReportPanel?.render();
 

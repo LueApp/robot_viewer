@@ -197,23 +197,19 @@ export class CodeEditorManager {
             const blob = new Blob([newContent], { type: 'text/plain' });
             const newFile = new File([blob], fileName, { type: fileType });
 
-            if (this.editorState.currentFile) {
-                const keysToUpdate = [];
-                for (const [key] of this.fileMap.entries()) {
-                    if (key.endsWith(fileName) || key === fileName) keysToUpdate.push(key);
-                }
-                keysToUpdate.forEach(key => this.fileMap.set(key, newFile));
+            const hadCurrentFile = Boolean(this.editorState.currentFile);
+            if (hadCurrentFile) {
+                this.replaceCurrentFile(newFile);
             } else {
                 this.fileMap.set(fileName, newFile);
             }
 
-            const hadCurrentFile = Boolean(this.editorState.currentFile);
             this._reloadingInProgress = true;
             if (this.onReload) await this.onReload(newFile, true);
             this.editorState.currentContent = newContent;
+            this.editorState.currentFile = newFile;
 
             if (!hadCurrentFile) {
-                this.editorState.currentFile = newFile;
                 const filenameEl = document.getElementById('editor-filename');
                 if (filenameEl) filenameEl.textContent = fileName;
                 this.updateControlsVisibility?.();
@@ -231,6 +227,12 @@ export class CodeEditorManager {
     subscribeToContentChanges(listener) {
         this.contentChangeListeners.add(listener);
         return () => this.contentChangeListeners.delete(listener);
+    }
+
+    replaceCurrentFile(newFile) {
+        for (const [path, file] of this.fileMap) {
+            if (file === this.editorState.currentFile) this.fileMap.set(path, newFile);
+        }
     }
 
     /**
@@ -331,13 +333,7 @@ export class CodeEditorManager {
             });
 
             // 3. Update all related fileMap entries (don't add new, only replace)
-            for (const [key, value] of this.fileMap.entries()) {
-                if (value === this.editorState.currentFile ||
-                    key === fileName ||
-                    key.endsWith('/' + fileName)) {
-                    this.fileMap.set(key, newFile);
-                }
-            }
+            this.replaceCurrentFile(newFile);
 
             // 4. Update editor state
             this.editorState.currentFile = newFile;

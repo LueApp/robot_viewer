@@ -3,6 +3,7 @@
  * Unified management of STL, OBJ, DAE, GLTF and other format loading
  */
 import * as THREE from 'three';
+import { loadSTLGeometry } from '../loaders/STLGeometry.js';
 import { normalizePath, resolveFileFromMap } from './FileUtils.js';
 
 // Cache loaders for performance
@@ -14,20 +15,17 @@ let loadersCache = null;
 async function getLoaders() {
     if (!loadersCache) {
         const [
-            { STLLoader },
             { OBJLoader },
             { MTLLoader },
             { ColladaLoader },
             { GLTFLoader }
         ] = await Promise.all([
-            import('three/examples/jsm/loaders/STLLoader.js'),
             import('three/examples/jsm/loaders/OBJLoader.js'),
             import('three/examples/jsm/loaders/MTLLoader.js'),
             import('three/examples/jsm/loaders/ColladaLoader.js'),
             import('three/examples/jsm/loaders/GLTFLoader.js')
         ]);
         loadersCache = {
-            STLLoader: new STLLoader(),
             OBJLoader: new OBJLoader(),
             MTLLoader: new MTLLoader(),
             ColladaLoader: new ColladaLoader(),
@@ -75,9 +73,7 @@ export async function loadMeshFile(meshPath, fileMap) {
 
             switch (fileExt) {
                 case 'stl':
-                    geometry = await new Promise((resolve, reject) => {
-                        loaders.STLLoader.load(url, resolve, undefined, reject);
-                    });
+                    geometry = await loadSTLGeometry(file);
                     break;
 
                 case 'obj':

@@ -20,6 +20,7 @@
  * - The adapter automatically resolves file inclusions from the uploaded file map
  * - Mesh files are resolved using package:// paths or relative paths
  */
+import { loadSTLGeometry } from '../loaders/STLGeometry.js';
 import { XacroParser } from 'xacro-parser';
 import { URDFAdapter } from './URDFAdapter.js';
 import { resolveFileFromMap } from '../utils/FileUtils.js';
@@ -395,11 +396,7 @@ export class XacroAdapter {
 
             switch (ext) {
                 case 'stl': {
-                    const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js');
-                    const stlLoader = new STLLoader(manager);
-                    const stlGeometry = await new Promise((resolve, reject) => {
-                        stlLoader.load(blobUrl, resolve, undefined, reject);
-                    });
+                    const stlGeometry = await loadSTLGeometry(file);
                     const stlMaterial = new THREE.MeshPhongMaterial();
                     meshObject = new THREE.Mesh(stlGeometry, stlMaterial);
                     break;

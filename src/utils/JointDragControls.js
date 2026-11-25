@@ -363,7 +363,7 @@ export class JointDragControls {
                 let newAngle = currentValue + delta;
 
                 // Apply limits
-                if (manipulating.limits) {
+                if (manipulating.limits && manipulating.type !== 'continuous') {
                     const ignoreLimits = this.model?.userData?.ignoreLimits || this.model?.threeObject?.userData?.ignoreLimits || false;
                     if (!ignoreLimits) {
                         newAngle = Math.max(manipulating.limits.lower, Math.min(manipulating.limits.upper, newAngle));
@@ -428,6 +428,14 @@ export class PointerJointDragControls extends JointDragControls {
         const updateMouse = (e) => {
             // Use getBoundingClientRect() to get more accurate coordinates
             const rect = domElement.getBoundingClientRect();
+            if (!this.manipulatingLink && this.getPointerModel) {
+                const model = this.getPointerModel(e.clientX);
+                if (model !== this.model) {
+                    if (this.hovered) this.onUnhover(this.hovered);
+                    this.hovered = null;
+                    this.model = model;
+                }
+            }
             mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         };
@@ -520,7 +528,7 @@ export class PointerJointDragControls extends JointDragControls {
         };
 
         this._mouseLeave = () => {
-            if (this.manipulating) {
+            if (this.manipulatingLink) {
                 this.setGrabbed(false);
             }
             if (this.hovered) {

@@ -3,11 +3,12 @@
  * Selects appropriate adapter based on file type
  */
 import * as THREE from 'three';
+import { loadSTLGeometry } from './STLGeometry.js';
 import { URDFAdapter } from '../adapters/URDFAdapter.js';
 import { MJCFAdapter } from '../adapters/MJCFAdapter.js';
 import { USDAdapter } from '../adapters/USDAdapter.js';
 import { XacroAdapter } from '../adapters/XacroAdapter.js';
-import { resolveFileFromMap } from '../utils/FileUtils.js';
+import { normalizePath, resolveFileFromMap } from '../utils/FileUtils.js';
 
 export class ModelLoaderFactory {
     /**
@@ -114,7 +115,7 @@ export class ModelLoaderFactory {
 
         switch (fileType) {
             case 'urdf':
-                return await this.loadURDF(content, fileName, fileMap, file);
+                return await this.loadURDF(content, fileName, fileMap, file, options);
             case 'xacro':
                 return await this.loadXacro(content, fileName, fileMap, file);
             case 'mjcf':
@@ -133,164 +134,70 @@ export class ModelLoaderFactory {
      * @param {Map} fileMap - File map
      * @param {File} file - Original file object (optional)
      */
-    static async loadURDF(content, fileName, fileMap = null, file = null) {
-        // Dynamically import urdf-loader
-        let URDFLoader;
-        try {
-            const urdfModule = await import('urdf-loader');
-            URDFLoader = urdfModule.URDFLoader || urdfModule.default || urdfModule;
-        } catch (error) {
-            throw new Error('Failed to load urdf-loader: ' + error.message);
+    static async loadURDF(content, fileName, fileMap = null, file = null, { visualOnly = false, requireMeshes = visualOnly } = {}) {
+        const { default: URDFLoader } = await import('urdf-loader');
+        // A loader and its URL modifier belong to one version, including late texture requests.
+        const manager = new THREE.LoadingManager();
+        const loader = new URDFLoader(manager);
+        loader.parseCollision = !visualOnly;
+        const urdfDir = normalizePath(fileName).split('/').slice(0, -1).join('/');
+        const meshLoads = [];
+
+        if (fileMap) {
+            const assets = new Map();
+            for (const [path, asset] of fileMap) assets.set(normalizePath(path), asset);
+            const resolveAsset = path => resolveFileFromMap(path, assets, { baseDir: urdfDir });
+            loader.packages = pkg => 'package://' + pkg;
+            const objectUrls = new Set();
+            manager.setURLModifier(url => {
+                // Mesh loaders already hold a valid object URL for the main mesh.
+                if (url.startsWith('blob:') && !/\.\w+$/.test(url)) return url;
+                const asset = resolveAsset(url);
+                if (!asset) return url;
+                const objectUrl = URL.createObjectURL(asset);
+                objectUrls.add(objectUrl);
+                return objectUrl;
+            });
+            manager.onLoad = () => {
+                for (const url of objectUrls) URL.revokeObjectURL(url);
+                objectUrls.clear();
+            };
+
+            const defaultLoadMesh = loader.loadMeshCb;
+            loader.loadMeshCb = (path, manager, done) => {
+                const asset = resolveAsset(path);
+                if (!asset && !requireMeshes) {
+                    defaultLoadMesh(path.replace(/^package:\/\//, ''), manager, done);
+                    return;
+                }
+
+                const loadMesh = async () => {
+                    if (!asset) throw new Error(`Missing mesh: ${path}`);
+                    const ext = asset.name.toLowerCase().split('.').pop();
+                    const mesh = await this.loadMeshFileAsync(asset, ext, manager);
+                    if (!mesh) throw new Error(`Cannot load mesh: ${path}`);
+                    done(mesh);
+                };
+                if (requireMeshes) {
+                    meshLoads.push(loadMesh());
+                } else {
+                    loadMesh().catch(error => done(null, error));
+                }
+            };
         }
 
-        return new Promise((resolve, reject) => {
-            const loader = new URDFLoader();
-
-            // Enable collision parsing
-            loader.parseCollision = true;
-
-            // Extract directory where URDF file is located (workingPath)
-            // fileName might be "e3.urdf" or "e3_v2/e3.urdf"
-            const urdfDir = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
-
-            // If file map provided, setup resource loader
-            if (fileMap) {
-                // Parse URDF content, find all used package names
-                const packages = this.extractPackagesFromURDF(content);
-
-                // Build package map (urdf-loader expects string paths)
-                const packageMap = {};
-
-                // Create mapping for each package, return a path prefix for resolvePath
-                packages.forEach(pkg => {
-                    // Provide a path prefix, resolvePath will concatenate it with relative path
-                    // Example: if URDF has package://go2w_description/meshes/file.stl
-                    // resolvePath returns: packages['go2w_description'] + '/' + 'meshes/file.stl'
-                    // We return a virtual path, actual loading handled in loadMeshCb
-                    packageMap[pkg] = pkg; // Return package name itself
-                });
-
-                // Add default empty package mapping
-                packageMap[''] = '';
-
-                loader.packages = packageMap;
-
-                // Set URL Modifier to intercept all URL requests (including textures)
-                // This MUST be set on loader.manager to catch TextureLoader requests
-                const urlModifier = (url) => {
-                    // Check if this is a malformed blob URL (blob:http://host/filename instead of blob:http://host/uuid)
-                    // This can happen when ColladaLoader or other loaders incorrectly create blob URLs
-                    if (url.startsWith('blob:')) {
-                        // Extract the path after blob:http://host/
-                        const blobMatch = url.match(/^blob:https?:\/\/[^\/]+\/(.+)$/);
-                        if (blobMatch && blobMatch[1]) {
-                            const fileName = blobMatch[1];
-                            // If it looks like a filename (has extension), it's a malformed blob URL
-                            if (/\.(jpg|jpeg|png|gif|bmp|tga|tiff|webp|dae|stl|obj|gltf|glb)$/i.test(fileName)) {
-                                // Treat it as a regular file path and process it
-                                url = fileName;
-                            } else {
-                                // Valid blob URL format (has UUID), return as-is
-                                return url;
-                            }
-                        } else {
-                            // Valid blob URL format, return as-is
-                            return url;
-                        }
-                    }
-
-                    const isTextureFile = /\.(jpg|jpeg|png|gif|bmp|tga|tiff|webp)$/i.test(url);
-                    const isMeshFile = /\.(dae|stl|obj|gltf|glb)$/i.test(url);
-
-                    // Clean path - handle both absolute URLs and relative paths
-                    let meshPath = url;
-
-                    // Remove http:// or https:// prefix if present (shouldn't happen but be safe)
-                    if (meshPath.startsWith('http://') || meshPath.startsWith('https://')) {
-                        // This is an absolute URL, try to extract path
-                        try {
-                            const urlObj = new URL(meshPath);
-                            meshPath = urlObj.pathname;
-                            // Remove leading slash
-                            if (meshPath.startsWith('/')) {
-                                meshPath = meshPath.substring(1);
-                            }
-                        } catch (e) {
-                            // Invalid URL, use as-is
-                        }
-                    }
-
-                    const matchedFile = resolveFileFromMap(meshPath, fileMap, { baseDir: urdfDir });
-
-                    if (matchedFile) {
-                        // Create Blob URL (don't revoke immediately, let loader finish using it)
-                        const bloburl = URL.createObjectURL(matchedFile);
-                        // IMPORTANT: Return the blob URL directly - TextureLoader will use it as-is
-                        return bloburl;
-                    }
-
-                    // If not found, return original URL - urdf-loader will handle it
-                    return url;
-                };
-
-                // Set the URL modifier on the manager
-                loader.manager.setURLModifier(urlModifier);
-
-                // Custom loadMeshCb to load mesh files from fileMap
-                const originalLoadMeshCb = loader.loadMeshCb || loader.defaultMeshLoader.bind(loader);
-                loader.loadMeshCb = (path, manager, done) => {
-                    // Use Promise but don't await, let loading happen in background
-                    this.findFileInMapByPath(path, fileMap, urdfDir).then(file => {
-                        if (file) {
-                            // Directly use Three.js loaders to load mesh file
-
-                            // Select appropriate loader based on file extension
-                            const ext = (file.name || path).toLowerCase().split('.').pop();
-
-                            // Dynamically import corresponding loader and load file
-                            this.loadMeshFileAsync(file, ext, manager).then(meshObject => {
-                                if (meshObject) {
-                                    done(meshObject, null);
-                                } else {
-                                    done(null, new Error(`Failed to load mesh file: ${path}`));
-                                }
-                            }).catch(err => {
-                                console.error(`Failed to load mesh: ${path}`, err);
-                                done(null, err);
-                            });
-                        } else {
-                            // If not found, try using original path loader
-                            originalLoadMeshCb(path, manager, done);
-                        }
-                    }).catch(error => {
-                        console.error(`Failed to find file: ${path}`, error);
-                        // Try using original path loader
-                        originalLoadMeshCb(path, manager, done);
-                    });
-                };
-            }
-
-            // Create temporary URL
-            const blob = new Blob([content], { type: 'text/xml' });
-            const url = URL.createObjectURL(blob);
-
-            loader.load(url, (robot) => {
-                URL.revokeObjectURL(url);
-
-                // Convert to unified model
-                try {
-                    const model = URDFAdapter.convert(robot, content); // Pass original XML content
-                    resolve(model);
-                } catch (error) {
-                    console.error('URDF conversion error:', error);
-                    reject(new Error('URDF conversion failed: ' + error.message));
-                }
-            }, undefined, (error) => {
-                URL.revokeObjectURL(url);
-                console.error('URDF loading error:', error);
-                reject(new Error('URDF loading failed: ' + (error.message || error)));
-            });
-        });
+        const xml = new DOMParser().parseFromString(content, 'text/xml');
+        if (xml.documentElement.nodeName !== 'robot' || !xml.querySelector('robot > link')) {
+            throw new Error('Expected a URDF robot with at least one link.');
+        }
+        let robot;
+        try {
+            robot = loader.parse(xml);
+        } finally {
+            // Mesh loading starts during parse. Wait even if a later link fails to parse.
+            await Promise.all(meshLoads);
+        }
+        return URDFAdapter.convert(robot, content);
     }
 
     /**
@@ -584,11 +491,7 @@ export class ModelLoaderFactory {
 
             switch (fileExt) {
                 case 'stl':
-                    const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js');
-                    const stlLoader = new STLLoader();
-                    const stlGeometry = await new Promise((resolve, reject) => {
-                        stlLoader.load(blobUrl, resolve, undefined, reject);
-                    });
+                    const stlGeometry = await loadSTLGeometry(file);
                     const stlMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc });
                     meshObject = new THREE.Mesh(stlGeometry, stlMaterial);
                     break;
@@ -670,11 +573,7 @@ export class ModelLoaderFactory {
 
             switch (ext) {
                 case 'stl': {
-                    const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js');
-                    const stlLoader = new STLLoader(manager);
-                    const stlGeometry = await new Promise((resolve, reject) => {
-                        stlLoader.load(blobUrl, resolve, undefined, reject);
-                    });
+                    const stlGeometry = await loadSTLGeometry(file);
                     // Use MeshPhongMaterial to match URDFLoader behavior
                     const stlMaterial = new THREE.MeshPhongMaterial();
                     meshObject = new THREE.Mesh(stlGeometry, stlMaterial);

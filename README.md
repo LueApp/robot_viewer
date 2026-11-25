@@ -65,6 +65,27 @@ Output will be in the `dist/` directory, including the standalone HTML at
 offline HTML** button downloads this file. Each production build regenerates it
 from the same sources as the website.
 
+### Compare two URDF versions
+
+Drop two `.urdf` files together, or select both with **Files → Load Files**.
+Both robots share a root frame and camera. In **Wipe**, drag the divider to
+reveal the primary on the left and the reference on the right, each in its own
+materials. Drag a movable link on either side to pose that robot. Choose **Overlay** and adjust **Opacity** to see the shaded reference
+over the primary.
+
+Open **Joints → Compare poses** to move either robot. Each column has a slider
+and numeric input per movable joint. Turn on **Link matching joints** to align
+the reference to the primary and move compatible same-named joints together
+from either column. Each robot keeps its own joint limits. **Primary tools**
+opens the existing single-robot controls.
+
+For models in separate locations, open **Files → Compare URDFs** and use
+**Choose primary folder** and **Choose reference folder** in either order.
+Include each robot’s meshes in its folder. If a folder contains several URDFs,
+select the one to display. You can replace either folder while keeping the other
+robot. If both versions are in one folder, choose the second URDF in
+**Reference URDF**. Toggle **Show reference** to inspect the primary alone, or select **No reference** to end the comparison.
+
 ### Single-file offline HTML
 
 Run `npm run build:offline-html` to create

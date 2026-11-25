@@ -28,35 +28,20 @@ export function getFileFromEntry(entry) {
  */
 export async function readDirectory(dirEntry, fileMap) {
     const files = [];
-
-    return new Promise((resolve, reject) => {
-        const reader = dirEntry.createReader();
-
-        function readEntries() {
-            reader.readEntries(async (entries) => {
-                if (entries.length === 0) {
-                    resolve(files);
-                    return;
-                }
-
-                for (const entry of entries) {
-                    if (entry.isFile) {
-                        const file = await getFileFromEntry(entry);
-                        const path = entry.fullPath || entry.name;
-                        fileMap.set(path, file);
-                        files.push(file);
-                    } else if (entry.isDirectory) {
-                        const subFiles = await readDirectory(entry, fileMap);
-                        files.push(...subFiles);
-                    }
-                }
-
-                readEntries();
-            }, reject);
+    const reader = dirEntry.createReader();
+    while (true) {
+        const entries = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+        if (!entries.length) return files;
+        for (const entry of entries) {
+            if (entry.isDirectory) {
+                files.push(...await readDirectory(entry, fileMap));
+            } else if (entry.isFile) {
+                const file = await getFileFromEntry(entry);
+                fileMap.set(entry.fullPath || entry.name, file);
+                files.push(file);
+            }
         }
-
-        readEntries();
-    });
+    }
 }
 
 /**
@@ -169,6 +154,23 @@ export function resolveFileFromMap(path, fileMap, options = {}) {
     const candidates = [];
     const rawPath = stripBlobPath(path);
 
+    // Resolve against this URDF's directory before looking elsewhere in the import.
+    // Two revisions can contain the same ROS package and the same mesh filenames.
+    if (baseDir) {
+        const dirs = cleanFilePath(baseDir).split('/');
+        if (rawPath.startsWith('package://')) {
+            const packagePath = rawPath.slice('package://'.length);
+            const relativePath = packagePath.split('/').slice(1).join('/');
+            while (dirs.length) {
+                const prefix = dirs.join('/') + '/';
+                addCandidate(candidates, prefix + packagePath);
+                addCandidate(candidates, prefix + relativePath);
+                dirs.pop();
+            }
+        } else {
+            addCandidate(candidates, dirs.join('/') + '/' + rawPath);
+        }
+    }
     addCandidate(candidates, rawPath);
 
     if (rawPath.startsWith('package://')) {
@@ -185,13 +187,7 @@ export function resolveFileFromMap(path, fileMap, options = {}) {
     const normalizedParts = normalizedPath.split('/');
     if (normalizedParts.length > 1) {
         addCandidate(candidates, normalizedParts.slice(1).join('/'));
-    }
-
-    if (baseDir && normalizedPath && !normalizedPath.startsWith(baseDir)) {
-        addCandidate(candidates, baseDir + normalizedPath);
-        if (normalizedParts.length > 1) {
-            addCandidate(candidates, baseDir + normalizedParts.slice(1).join('/'));
-        }
+        if (baseDir) addCandidate(candidates, cleanFilePath(baseDir) + '/' + normalizedParts.slice(1).join('/'));
     }
 
     for (const candidate of candidates) {

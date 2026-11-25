@@ -4070,6 +4070,19 @@
             </div>
 
             <canvas id="canvas"></canvas>
+            <div id="comparison-divider" hidden aria-hidden="true">
+                <div class="comparison-side-names"><span data-i18n="posePrimary">Primary</span><span data-i18n="poseReference">Reference</span></div>
+                <span class="comparison-grip">‹ ›</span>
+            </div>
+            <div id="comparison-view" hidden>
+                <div class="comparison-segments">
+                    <button type="button" data-view="wipe" aria-pressed="true" data-i18n="compareWipe">Wipe</button>
+                    <button type="button" data-view="overlay" aria-pressed="false" data-i18n="compareOverlay">Overlay</button>
+                </div>
+                <label for="comparison-mix" data-mix-label></label>
+                <input id="comparison-mix" type="range" min="0" max="100" value="50">
+                <output for="comparison-mix" data-mix-value>50%</output>
+            </div>
             <div id="measure-length-hint" role="status" aria-live="polite" hidden></div>
 
             <div id="floating-inertia-report-panel" class="floating-panel" style="display: none;">
@@ -4124,6 +4137,31 @@
                     <button class="panel-maximize-btn" data-panel-id="floating-files-panel">⛶</button>
                     <button class="panel-close-btn" data-panel="floating-files-panel">✕</button>
                 </div>
+                <details id="urdf-comparison" hidden>
+                    <summary data-i18n="compareURDFs">Compare URDFs</summary>
+                    <div class="comparison-fields">
+                        <div class="comparison-slot">
+                            <label for="primary-urdf" data-i18n="comparisonPrimary">Primary URDF</label>
+                            <button class="control-button" type="button" data-open-primary-folder data-i18n="comparisonPrimaryFolder">Choose primary folder</button>
+                            <input type="file" data-primary-folder webkitdirectory multiple hidden>
+                            <select id="primary-urdf" data-primary-select></select>
+                            <output data-primary-status aria-live="polite"></output>
+                        </div>
+                        <div class="comparison-slot">
+                            <label for="reference-urdf" data-i18n="comparisonReference">Reference URDF</label>
+                            <button class="control-button" type="button" data-open-folder data-i18n="comparisonReferenceFolder">Choose reference folder</button>
+                            <input type="file" data-reference-folder webkitdirectory multiple hidden>
+                            <select id="reference-urdf" data-reference-select></select>
+                            <button class="control-button" type="button" data-open-files data-i18n="comparisonReferenceFiles">Choose reference files</button>
+                            <input type="file" data-reference-files multiple hidden>
+                        </div>
+                        <label data-overlay-control hidden>
+                            <input type="checkbox" data-show-overlay checked>
+                            <span data-i18n="comparisonShowReference">Show reference</span>
+                        </label>
+                        <output data-comparison-status aria-live="polite"></output>
+                    </div>
+                </details>
                 <div class="floating-panel-content" id="model-list">
                     <div class="empty-state" data-i18n="noFolder"></div>
                 </div>
@@ -4146,6 +4184,17 @@
                         <button class="panel-maximize-btn" data-panel-id="floating-joints-panel">⛶</button>
                         <button class="panel-close-btn" data-panel="floating-joints-panel">✕</button>
                     </div>
+                </div>
+                <div id="comparison-joint-tabs" class="comparison-segments" hidden>
+                    <button type="button" data-pose-page="compare" aria-pressed="true" data-i18n="comparePoses">Compare poses</button>
+                    <button type="button" data-pose-page="primary" aria-pressed="false" data-i18n="comparePrimaryTools">Primary tools</button>
+                </div>
+                <div id="comparison-poses" hidden>
+                    <div class="comparison-pose-heading">
+                        <label><input type="checkbox" data-link-poses> <span data-i18n="compareLink">Link matching joints</span></label>
+                        <div class="comparison-columns"><span data-i18n="posePrimary">Primary</span><span data-i18n="poseReference">Reference</span></div>
+                    </div>
+                    <div data-pose-rows></div>
                 </div>
                 <div id="vector-input-area">
                     <button class="control-button" id="toggle-end-move" type="button" data-i18n="endMove">Move end</button>

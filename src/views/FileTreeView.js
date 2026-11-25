@@ -254,13 +254,7 @@ export class FileTreeView {
             let targetItem = null;
 
             allTreeItems.forEach(item => {
-                const nameSpan = item.querySelector('.name');
-                if (nameSpan && nameSpan.textContent === file.name) {
-                    const parent = item.parentElement;
-                    if (parent) {
-                        targetItem = item;
-                    }
-                }
+                if (item.dataset.filePath === filePath) targetItem = item;
             });
 
             if (targetItem) {
@@ -405,6 +399,7 @@ export class FileTreeView {
 
         files.forEach(fileInfo => {
             const item = this.createTreeItem(fileInfo.name, fileInfo.ext);
+            item.dataset.filePath = fileInfo.path;
             item.addEventListener('click', (e) => {
                 e.stopPropagation();
                 document.querySelectorAll('.tree-item.selected').forEach(elem => {

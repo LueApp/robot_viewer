@@ -110,6 +110,7 @@ export class LiveStatePanel {
 
     lock(active) {
         this.app.poseController.liveLocked = active;
+        this.app.comparisonPoseControls?.refresh();
         const jointPanel = document.getElementById('joint-controls-panel');
         if (jointPanel) jointPanel.inert = active;
         if (active) {

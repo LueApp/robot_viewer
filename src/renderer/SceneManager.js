@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { canLinkJoints } from './URDFOverlay.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PointerJointDragControls } from '../utils/JointDragControls.js';
 import { ModelLoaderFactory } from '../loaders/ModelLoaderFactory.js';
@@ -36,10 +37,16 @@ export class SceneManager {
         this.camera.lookAt(0, 0, 0);
 
         // Renderer
-        this.renderer = new THREE.WebGLRenderer({
-            canvas: canvas,
-            antialias: true
-        });
+        try {
+            this.renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                antialias: true
+            });
+        } catch (cause) {
+            const error = new Error('Unable to initialize the WebGL renderer.', { cause });
+            error.code = 'WEBGL_UNAVAILABLE';
+            throw error;
+        }
         this.renderer.setSize(width, height);
         this.renderer.setPixelRatio(window.devicePixelRatio);
 
@@ -99,6 +106,10 @@ export class SceneManager {
 
         // Current model
         this.currentModel = null;
+        this.comparisonView = 'wipe';
+        this.comparisonSplit = 0.5;
+        this.comparisonOpacity = 0.45;
+        this.comparisonLinked = false;
         this.ignoreLimits = false;
         this.poseController = null;
         this._draggedJointName = null;
@@ -125,8 +136,7 @@ export class SceneManager {
         const renderLoop = () => {
             // Only render when needed (controlled by _dirty flag)
             if (this._dirty) {
-                this.renderer.render(this.scene, this.camera);
-                this._dirty = false;
+                this.render();
             }
             this._renderLoopId = requestAnimationFrame(renderLoop);
         };
@@ -167,7 +177,35 @@ export class SceneManager {
             return;
         }
         // Render immediately (for scenes requiring immediate update)
-        this.renderer.render(this.scene, this.camera);
+        const reference = this.comparisonOverlay?.root;
+        const primary = this.currentModel?.threeObject;
+        if (reference?.visible && primary && this.comparisonView === 'wipe') {
+            // Both passes use the same full-canvas projection. Only their pixels are cropped.
+            const width = this.canvas.clientWidth;
+            const height = this.canvas.clientHeight;
+            const split = Math.round(width * this.comparisonSplit);
+            const wasVisible = primary.visible;
+            this.renderer.setScissorTest(true);
+            try {
+                if (split > 0) {
+                    reference.visible = false;
+                    this.renderer.setScissor(0, 0, split, height);
+                    this.renderer.render(this.scene, this.camera);
+                }
+                if (split < width) {
+                    reference.visible = true;
+                    primary.visible = false;
+                    this.renderer.setScissor(split, 0, width - split, height);
+                    this.renderer.render(this.scene, this.camera);
+                }
+            } finally {
+                reference.visible = true;
+                primary.visible = wasVisible;
+                this.renderer.setScissorTest(false);
+            }
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
         this._dirty = false;
     }
 
@@ -186,7 +224,7 @@ export class SceneManager {
         }
 
         // Check if single mesh model (no joints)
-        const isSingleMesh = !model.joints || model.joints.size === 0;
+        const isSingleMesh = !model.threeObject.isURDFRobot && !model.joints?.size;
 
         if (isSingleMesh) {
             // Single mesh file: add directly to scene, no world rotation
@@ -204,6 +242,10 @@ export class SceneManager {
 
             // Add model to world
             this.world.add(model.threeObject);
+            if (this.comparisonOverlay) {
+                this.alignLinkedJoints();
+                this.emit('comparisonChanged');
+            }
 
             // Read and apply current coordinate system setting
             const upSelect = document.getElementById('up-select');
@@ -272,6 +314,7 @@ export class SceneManager {
             // Use requestAnimationFrame to ensure rendering completes
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
+                    if (this.currentModel !== model) return;
                     this.updateEnvironment(true);
 
                     // Trigger model ready event
@@ -282,22 +325,72 @@ export class SceneManager {
             // URDF/MJCF model: mesh files are loaded asynchronously, need to delay
             // Multiple extractions to catch meshes loaded at different times
             setTimeout(() => {
+                if (this.currentModel !== model) return;
                 this.visualizationManager.extractVisualAndCollision(model);
             }, 100);
 
             setTimeout(() => {
+                if (this.currentModel !== model) return;
                 this.visualizationManager.extractVisualAndCollision(model);
                 this.updateEnvironment(true);
                 this.emit('modelReady', model);
             }, 1000);
 
             setTimeout(() => {
+                if (this.currentModel !== model) return;
                 this.visualizationManager.extractVisualAndCollision(model);
             }, 2500);
         }
     }
 
-    removeModel(model) {
+    setComparisonOverlay(overlay) {
+        if (this.comparisonOverlay && this.dragControls?.model === this.comparisonOverlay.model) {
+            this.dragControls.setGrabbed(false);
+            this.dragControls.hovered = null;
+            this.dragControls.model = this.currentModel;
+        }
+        this.comparisonOverlay?.dispose();
+        this.comparisonOverlay = overlay;
+        if (overlay) {
+            this.currentModel.threeObject.parent.add(overlay.root);
+            overlay.setView(this.comparisonView, this.comparisonOpacity);
+            this.alignLinkedJoints();
+        } else {
+            this.comparisonLinked = false;
+        }
+        this.emit('comparisonChanged');
+        this.updateEnvironment(Boolean(overlay));
+        this.redraw();
+    }
+
+    modelAtCanvasX(clientX) {
+        if (this.comparisonView === 'wipe' && this.comparisonOverlay?.root.visible) {
+            const rect = this.canvas.getBoundingClientRect();
+            if (clientX >= rect.left + rect.width * this.comparisonSplit) return this.comparisonOverlay.model;
+        }
+        return this.currentModel;
+    }
+
+    setReferenceJoint(name, value, commit = false) {
+        const reference = this.comparisonOverlay?.model.joints.get(name);
+        if (!reference) return;
+        const linked = this.comparisonLinked && canLinkJoints(this.currentModel.joints.get(name), reference);
+        if (linked && this.poseController?.liveLocked) return;
+        const applied = this.comparisonOverlay.setJoint(name, value);
+        if (applied === undefined) return;
+        if (linked) this.poseController.setJointValue(name, applied, { source: 'comparison-reference', commit });
+        this.emit('referencePoseChanged');
+        this.redraw();
+    }
+
+    alignLinkedJoints() {
+        if (this.comparisonLinked && this.comparisonOverlay) {
+            this.currentModel.joints.forEach(joint => this.comparisonOverlay.syncJoint(joint));
+        }
+    }
+
+    removeModel(model, keepComparison = false) {
+        if (this.comparisonOverlay && !keepComparison) this.setComparisonOverlay(null);
         if (model && model.threeObject && model.threeObject.parent) {
             model.threeObject.parent.remove(model.threeObject);
         }
@@ -343,6 +436,7 @@ export class SceneManager {
         // Directly calculate entire model's bounding box in scene global coordinate system
         const bboxGlobal = new THREE.Box3();
         bboxGlobal.setFromObject(model.threeObject, true);
+        if (this.comparisonOverlay) bboxGlobal.expandByObject(this.comparisonOverlay.root, true);
 
         if (bboxGlobal.isEmpty()) {
             return;
@@ -557,7 +651,13 @@ export class SceneManager {
     // ==================== Drag Controls ====================
 
     setPoseController(poseController) {
+        this.unsubscribeComparisonPose?.();
         this.poseController = poseController;
+        this.unsubscribeComparisonPose = poseController?.subscribe(event => {
+            if (this.comparisonLinked && event.type === 'jointChanged' && event.source !== 'comparison-reference') {
+                this.comparisonOverlay?.syncJoint(event.joint);
+            }
+        });
     }
 
     initDragControls(model) {
@@ -592,10 +692,14 @@ export class SceneManager {
             }
         }
 
-        // Also pass model itself to dragControls
-        this.dragControls.model = model;
+        // Keep a drag on its starting robot, even when the pointer crosses the divider.
+        this.dragControls.getPointerModel = x => this.modelAtCanvasX(x);
 
         this.dragControls.onUpdateJoint = (joint, angle) => {
+            if (this.dragControls.model === this.comparisonOverlay?.model) {
+                this.setReferenceJoint(joint.name, angle);
+                return;
+            }
             // Check ignoreLimits flag (try getting from multiple locations, ensure reading latest value)
             const checkIgnoreLimits = this.ignoreLimits ||
                                      (model && model.userData && model.userData.ignoreLimits) ||
@@ -629,19 +733,20 @@ export class SceneManager {
 
         // Hover highlight callback (handle immediately, like urdf-loaders)
         this.dragControls.onHover = (link) => {
-            if (link) {
+            if (link && this.dragControls.model === model) {
                 this.highlightManager.highlightLink(link, this.currentModel);
             }
         };
 
         this.dragControls.onUnhover = (link) => {
-            if (link) {
+            if (link && this.dragControls.model === model) {
                 this.highlightManager.unhighlightLink(link, this.currentModel);
             }
         };
 
         this.dragControls.onDragStart = (link) => {
             this.controls.enabled = false;
+            if (this.dragControls.model !== model) return;
 
             // If joint axes switch on, temporarily show only dragging joint's rotation axis
             if (link && link.threeObject) {
@@ -667,6 +772,10 @@ export class SceneManager {
         this.dragControls.onDragEnd = (link) => {
             this.controls.enabled = true;
 
+            if (this.dragControls.model === this.comparisonOverlay?.model && this.dragControls.manipulating) {
+                const joint = this.dragControls.manipulating;
+                this.setReferenceJoint(joint.name, joint.threeObject.angle, true);
+            }
             if (this.poseController && this._draggedJointName) {
                 this.poseController.commitJointValue(this._draggedJointName, { source: 'viewport' });
             }
@@ -699,21 +808,6 @@ export class SceneManager {
                     this.currentModel.threeObject.userData = {};
                 }
                 this.currentModel.threeObject.userData.ignoreLimits = ignore;
-            }
-        }
-
-        // Update drag controls' model reference
-        if (this.dragControls && this.dragControls.model) {
-            if (!this.dragControls.model.userData) {
-                this.dragControls.model.userData = {};
-            }
-            this.dragControls.model.userData.ignoreLimits = ignore;
-
-            if (this.dragControls.model.threeObject) {
-                if (!this.dragControls.model.threeObject.userData) {
-                    this.dragControls.model.threeObject.userData = {};
-                }
-                this.dragControls.model.threeObject.userData.ignoreLimits = ignore;
             }
         }
     }

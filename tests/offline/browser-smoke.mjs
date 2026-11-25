@@ -8,6 +8,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startServer } from '../../tools/offline/server.mjs';
+import { checkComparisonFolders } from './comparison-folders.mjs';
 
 const archive = path.resolve(process.argv[2]);
 const standalone = archive.endsWith('.html');
@@ -102,12 +103,23 @@ try {
         await until(async () => fs.stat(downloaded).then(() => true, () => false), 'website offline download');
         assert.deepEqual(await fs.readFile(downloaded), await fs.readFile(archive));
         await fs.copyFile(downloaded, htmlCopy);
+        await checkComparisonFolders({ call, evaluate, until, temporary });
+        await evaluate(`(() => {
+            const dt = new DataTransfer();
+            for (const size of [1, 2]) {
+                const xml = '<robot name="v' + size + '"><link name="base"><visual><geometry><box size="1 1 ' + size + '"/></geometry></visual></link></robot>';
+                dt.items.add(new File([xml], 'v' + size + '.urdf'));
+            }
+            document.body.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+        })()`);
+        await until(() => evaluate('app.sceneManager.comparisonOverlay?.root.robotName === "v2"'), 'website pair import');
+        assert.equal(await evaluate('app.currentModel.threeObject.robotName'), 'v1');
         assert.deepEqual(pageErrors, []);
         external.length = 0; localRequests.length = 0;
         website.server.closeAllConnections();
         await new Promise(resolve => website.server.close(resolve));
         website = null;
-        console.log('PASS: website Help/About button downloads the exact standalone HTML');
+        console.log('PASS: website compares two dropped URDFs and downloads the exact standalone HTML');
     }
     await call('Page.navigate', { url: pageUrl });
     await call('Page.bringToFront');
@@ -120,6 +132,7 @@ try {
         assert.equal(await evaluate('document.getElementById("download-offline-html")'), null);
         console.log('PASS: standalone file:// startup without a server or sibling assets');
         await call('Page.setInterceptFileChooserDialog', { enabled: true });
+        await checkComparisonFolders({ call, evaluate, until, temporary });
         await evaluate('app.fileTreeView.triggerFileLoad()');
         const { root } = await call('DOM.getDocument');
         const { nodeId } = await call('DOM.querySelector', { nodeId: root.nodeId, selector: 'input[type=file][accept*=".urdf"]' });
@@ -217,7 +230,181 @@ try {
     assert.ok(await evaluate('app.currentModel.links.size > 1'));
     assert.ok(await evaluate('(() => { let count = 0; app.currentModel.threeObject.traverse(o => { if(o.isMesh) count++; }); return count; })()') > 0);
     console.log('PASS: URDF with local OBJ assets loads');
+    if (standalone) {
+        // Exercise the same FileList and drop path as selecting two loose files in Files.
+        const primary = path.join(repo, 'public/examples/joint-zero-demo.urdf');
+        const reference = path.join(temporary, 'revision.urdf');
+        await fs.writeFile(reference, (await fs.readFile(primary, 'utf8'))
+            .replace('radius="0.065"', 'radius="0.13"')
+            .replace('name="tip_slide"', 'name="revision_slide"')
+            .replace('upper="1.5707963267948966"', 'upper="1.1"'));
+        await evaluate('app.fileTreeView.triggerFileLoad()');
+        const { root } = await call('DOM.getDocument');
+        const { nodeId } = await call('DOM.querySelector', { nodeId: root.nodeId, selector: 'input[type=file][accept*=".urdf"]' });
+        await call('DOM.setFileInputFiles', { nodeId, files: [primary, reference] });
+        await until(() => evaluate('Boolean(app.sceneManager.comparisonOverlay)'), 'URDF pair import');
+        await waitForModelView();
+        assert.deepEqual(await evaluate(`(() => {
+            const scene = app.sceneManager;
+            const primary = app.currentModel.threeObject;
+            const overlay = scene.comparisonOverlay;
+            scene.setUp('+X');
+            primary.parent.updateMatrixWorld(true);
+            const angles = () => [primary.joints.motor_joint.angle, overlay.root.joints.motor_joint.angle];
+            const edit = (side, name, value, type = 'number') => {
+                const input = document.querySelector('input[type=' + type + '][data-pose-side=' + side + '][data-pose-joint=' + name + ']');
+                input.value = String(value);
+                input.dispatchEvent(new Event(type === 'range' ? 'input' : 'change'));
+            };
+            const initial = angles();
+            edit('primary', 'motor_joint', 0.45);
+            const primaryEdit = angles();
+            edit('reference', 'motor_joint', 0.2, 'range');
+            const referenceEdit = angles();
+            const link = document.querySelector('[data-link-poses]');
+            link.click();
+            const alignedPose = angles();
+            edit('reference', 'motor_joint', 0.7);
+            const fromReference = angles();
+            edit('primary', 'motor_joint', 1.4);
+            const limited = angles();
+            edit('primary', 'motor_joint', 0.9);
+            const fromPrimary = angles();
+            link.click();
+            document.getElementById('unit-deg').click();
+            edit('reference', 'revision_slide', 80);
+            const millimeters = overlay.root.joints.revision_slide.angle;
+            const missing = !document.querySelector('[data-pose-side=primary][data-pose-joint=revision_slide], [data-pose-side=reference][data-pose-joint=tip_slide]');
+            document.getElementById('unit-rad').click();
+            const wipe = scene.comparisonView === 'wipe' && !document.getElementById('comparison-divider').hidden &&
+                Array.from(overlay.originalMaterials).every(([mesh, original]) => mesh.material === original);
+            const mix = document.getElementById('comparison-mix');
+            mix.value = 32;
+            mix.dispatchEvent(new Event('input'));
+            document.querySelector('[data-view=overlay]').click();
+            mix.value = 62;
+            mix.dispatchEvent(new Event('input'));
+            const ghost = Array.from(overlay.originalMaterials.keys()).every(mesh =>
+                mesh.material === overlay.ghost && mesh.material.transparent && mesh.material.depthTest && !mesh.material.wireframe);
+            document.querySelector('[data-view=wipe]').click();
+            document.querySelector('[data-pose-page=primary]').click();
+            const tools = document.getElementById('comparison-poses').hidden;
+            document.querySelector('[data-pose-page=compare]').click();
+            document.querySelector('[data-show-overlay]').click();
+            const hidden = !overlay.root.visible && document.getElementById('comparison-view').hidden;
+            document.querySelector('[data-show-overlay]').click();
+            return {
+                primary: app.codeEditorManager.editorState.currentFile.name,
+                reference: document.querySelector('[data-reference-select]').selectedOptions[0].textContent,
+                aligned: primary.matrixWorld.equals(overlay.root.matrixWorld),
+                initial, primaryEdit, referenceEdit, alignedPose, fromReference, limited, fromPrimary, millimeters, missing,
+                wipe, ghost, split: scene.comparisonSplit, opacity: overlay.ghost.opacity, tools,
+                visible: hidden && overlay.root.visible
+            };
+        })()`), {
+            primary: 'joint-zero-demo.urdf', reference: 'revision.urdf', aligned: true,
+            initial: [0, 0], primaryEdit: [0.45, 0], referenceEdit: [0.45, 0.2], alignedPose: [0.45, 0.45],
+            fromReference: [0.7, 0.7], limited: [1.4, 1.1], fromPrimary: [0.9, 0.9], millimeters: 0.08, missing: true,
+            wipe: true, ghost: true, split: 0.32, opacity: 0.62, tools: true, visible: true
+        });
+        for (const side of ['reference', 'primary']) {
+            const drag = await evaluate(`(() => {
+                const scene = app.sceneManager;
+                const reference = scene.comparisonOverlay;
+                const primary = app.currentModel;
+                scene.setUp('+Z');
+                const mix = document.getElementById('comparison-mix');
+                mix.value = '${side}' === 'primary' ? 100 : 0;
+                mix.dispatchEvent(new Event('input'));
+                scene.render();
+                const model = '${side}' === 'primary' ? primary : reference.model;
+                const arm = model.threeObject.links.arm_link;
+                const point = scene.camera.position.clone().set(0.35, 0, 0);
+                arm.localToWorld(point).project(scene.camera);
+                const canvas = scene.canvas;
+                const rect = canvas.getBoundingClientRect();
+                const x = rect.left + (point.x + 1) * rect.width / 2;
+                const y = rect.top + (1 - point.y) * rect.height / 2;
+                const sendMouse = (kind, dx, dy) => canvas.dispatchEvent(new MouseEvent(kind, {
+                    clientX: x + dx, clientY: y + dy, button: 0, bubbles: true
+                }));
+                const before = [primary.threeObject.joints.motor_joint.angle, reference.root.joints.motor_joint.angle];
+                sendMouse('mousedown', 0, 0);
+                const grabbed = scene.dragControls.manipulating?.name;
+                sendMouse('mousemove', 15, -15);
+                sendMouse('mouseup', 15, -15);
+                const after = [primary.threeObject.joints.motor_joint.angle, reference.root.joints.motor_joint.angle];
+                return { grabbed, moved: after.map((v, i) => Math.abs(v - before[i]) > 1e-5) };
+            })()`);
+            assert.deepEqual(drag, { grabbed: 'motor_joint', moved: [side === 'primary', side === 'reference'] });
+        }
+        console.log('PASS: viewport drag changes only the robot visible on the selected side of the wipe');
+        // A separate version folder can reuse the primary file name and contain asynchronous meshes.
+        const folder = path.join(temporary, 'v2');
+        await fs.mkdir(path.join(folder, 'meshes'), { recursive: true });
+        await fs.writeFile(path.join(folder, 'joint-zero-demo.urdf'),
+            '<robot name="v2"><link name="base"><visual><geometry><mesh filename="package://bot/meshes/body.obj"/></geometry></visual></link></robot>');
+        await fs.writeFile(path.join(folder, 'meshes/body.obj'), 'v 0 0 0\nv 3 0 0\nv 0 2 0\nf 1 2 3\n');
+        const folderInput = await call('DOM.querySelector', { nodeId: root.nodeId, selector: '[data-reference-folder]' });
+        await call('DOM.setFileInputFiles', { nodeId: folderInput.nodeId, files: [folder] });
+        await until(() => evaluate('app.sceneManager.comparisonOverlay?.root.robotName === "v2"'), 'reference folder import');
+        assert.equal(await evaluate(`(() => {
+            const overlay = app.sceneManager.comparisonOverlay;
+            let meshes = 0;
+            overlay.root.traverse(o => { if (o.isMesh && o.material === overlay.originalMaterials.get(o)) meshes++; });
+            return meshes;
+        })()`), 1);
+        await evaluate('app.urdfComparison.importFiles([new File(["<invalid/>"], "broken.urdf")])');
+        assert.ok(await evaluate('document.querySelector("[data-comparison-status]").textContent.includes("broken.urdf")'));
+        assert.equal(await evaluate('app.sceneManager.comparisonOverlay.root.robotName'), 'v2');
+        await evaluate(`(() => {
+            const select = document.querySelector('[data-reference-select]');
+            select.value = '';
+            select.dispatchEvent(new Event('change'));
+            app.sceneManager.setUp('+Z');
+        })()`);
+        assert.equal(await evaluate('app.sceneManager.comparisonOverlay === null && app.currentModel.joints.has("motor_joint")'), true);
+        console.log('PASS: aligned wipe and shaded overlay, independent and linked poses, prismatic units, folder assets, failed replacement and removal');
+
+        // Import one project containing two revisions of the same ROS package.
+        const project = path.join(temporary, 'versions');
+        for (const [revision, width] of [['a', 2], ['b', 5]]) {
+            const pkg = path.join(project, revision, 'bot');
+            await fs.mkdir(path.join(pkg, 'urdf'), { recursive: true });
+            await fs.mkdir(path.join(pkg, 'meshes'));
+            await fs.writeFile(path.join(pkg, 'urdf/robot.urdf'),
+                `<robot name="${revision}"><link name="base"><visual name="body"><geometry><mesh filename="package://bot/meshes/body.obj"/></geometry></visual></link></robot>`);
+            await fs.writeFile(path.join(pkg, 'meshes/body.obj'), `v 0 0 0\nv ${width} 0 0\nv 0 1 0\nf 1 2 3\n`);
+        }
+        await evaluate('app.fileTreeView.triggerFileLoad(true)');
+        const projectInput = await call('DOM.querySelector', { nodeId: root.nodeId, selector: 'body > input[webkitdirectory]' });
+        await call('DOM.setFileInputFiles', { nodeId: projectInput.nodeId, files: [project] });
+        await until(() => evaluate('app.fileHandler.currentModelFile?.name === "robot.urdf" && app.urdfComparison.sources.length === 1'), 'multi-version project');
+        await waitForModelView();
+        await evaluate(`(() => {
+            const select = document.querySelector('[data-reference-select]');
+            select.value = '0';
+            select.dispatchEvent(new Event('change'));
+        })()`);
+        await until(() => evaluate('Boolean(app.sceneManager.comparisonOverlay)'), 'project reference');
+        assert.deepEqual(await evaluate(`(() => {
+            const width = robot => robot.visual.body.children[0].children[0].geometry.attributes.position.getX(1);
+            return [width(app.currentModel.threeObject), width(app.sceneManager.comparisonOverlay.root)].sort();
+        })()`), [2, 5]);
+        assert.equal(await evaluate(`(async () => {
+            const comparison = app.sceneManager.comparisonOverlay;
+            const reference = app.urdfComparison.active;
+            const editor = app.codeEditorManager;
+            editor.codeEditorInstance.setValue(editor.codeEditorInstance.getValue().replace(/<robot name="[^"]+"/, '<robot name="edited"'));
+            await editor.reloadFromEditor();
+            return app.currentModel.threeObject.robotName === 'edited' &&
+                app.sceneManager.comparisonOverlay === comparison &&
+                app.fileHandler.fileMap.get(reference.path) === reference.file;
+        })()`), true);
+        console.log('PASS: same-named URDFs use their own package meshes and editing the primary preserves the reference');
+    }
     await load('offline-demo.xacro');
+    assert.equal(await evaluate('!app.sceneManager.comparisonOverlay && document.querySelector("[data-primary-select]").disabled'), true);
     assert.equal(await evaluate('app.currentModel.joints.has("arm_joint")'), true);
     console.log('PASS: Xacro expansion and loading');
     await load('offline-demo.xml');
@@ -307,5 +494,5 @@ try {
     for (const process of [chrome, launcher]) if (process && process.exitCode === null) {
         const exited = once(process, 'exit'); process.kill(); await exited;
     }
-    await fs.rm(temporary, { recursive: true, force: true });
+    await fs.rm(temporary, { recursive: true, force: true, maxRetries: 5 });
 }

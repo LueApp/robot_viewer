@@ -4,13 +4,14 @@
  */
 import * as THREE from 'three';
 import { ModelLoaderFactory } from '../loaders/ModelLoaderFactory.js';
-import { readFileContent, getFileFromEntry, getFileTypeFromExtension, getFileDisplayType } from '../utils/FileUtils.js';
+import { readFileContent, getFileFromEntry, readDirectory, getFileTypeFromExtension } from '../utils/FileUtils.js';
 import { supportsUSD, isUSDFile } from '../config/features.js';
 
 export class FileHandler {
     constructor() {
         this.fileMap = new Map();
         this.availableModels = [];
+        this.loadSequence = 0;
         this.currentModelFile = null;
         this.onModelLoaded = null; // Callback function
         this.usdViewerManager = null; // USD viewer manager (lazy loaded)
@@ -78,117 +79,66 @@ export class FileHandler {
             await this.onInertiaReport(droppedFiles[0]);
             return;
         }
-        const items = e.dataTransfer.items;
-        if (!items || items.length === 0) return;
-
-        this.fileMap.clear();
-
-        const entries = [];
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            if (item.webkitGetAsEntry) {
-                const entry = item.webkitGetAsEntry();
-                if (entry) {
-                    entries.push(entry);
+        const sequence = ++this.loadSequence;
+        const entries = Array.from(e.dataTransfer.items || [], item => item.webkitGetAsEntry?.()).filter(Boolean);
+        const imported = new Map();
+        const files = [];
+        if (entries.length) {
+            for (const entry of entries) {
+                if (entry.isDirectory) {
+                    files.push(...await readDirectory(entry, imported));
+                } else if (entry.isFile) {
+                    const file = await getFileFromEntry(entry);
+                    imported.set(entry.fullPath || file.name, file);
+                    files.push(file);
                 }
             }
-        }
-
-        if (entries.length > 0) {
-            await this.processEntries(entries);
         } else {
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                for (const file of files) {
-                    const path = file.webkitRelativePath || file.name;
-                    this.fileMap.set(path, file);
-                    // Only add file.name as a separate key if there's no webkitRelativePath
-                    // This prevents duplicate entries in the file tree
-                    if (!file.webkitRelativePath) {
-                        this.fileMap.set(file.name, file);
-                    }
-                }
-
-                const loadableFiles = await this.findAllLoadableFiles(Array.from(files));
-
-                if (loadableFiles.length > 0) {
-                    this.availableModels = loadableFiles;
-                    this.onFilesLoaded?.(loadableFiles);
-                    await this.loadFileOrMesh(loadableFiles[0]);
-                }
-            }
-        }
-    }
-
-    /**
-     * Process file system entries
-     */
-    async processEntries(entries) {
-        const files = [];
-
-        for (const entry of entries) {
-            if (entry.isFile) {
-                const file = await getFileFromEntry(entry);
-                const path = entry.fullPath || entry.name;
-                this.fileMap.set(path, file);
+            for (const file of droppedFiles) {
+                imported.set(file.webkitRelativePath || file.name, file);
                 files.push(file);
-            } else if (entry.isDirectory) {
-                const dirFiles = await this.readDirectory(entry);
-                files.push(...dirFiles);
             }
         }
+        const models = await this.findAllLoadableFiles(files);
+        if (!files.length || sequence !== this.loadSequence) return;
 
-        if (files.length === 0) return;
-
-        const loadableFiles = await this.findAllLoadableFiles(files);
-
-        if (loadableFiles.length === 0) {
-            this.onFilesLoaded?.([]);
-            return;
+        // Selecting two loose URDFs is a pair import. A folder can hold many independent robots.
+        const isPair = files.length === 2 && files.every(f => /\.urdf$/i.test(f.name) && !f.webkitRelativePath)
+            && !entries.some(entry => entry.isDirectory);
+        if (isPair && imported.size === 1) {
+            // Browsers can give two files dragged from different windows the same path.
+            imported.clear();
+            files.forEach((file, i) => imported.set(`${i + 1}/${file.name}`, file));
         }
-
-        this.availableModels = loadableFiles;
-        this.onFilesLoaded?.(loadableFiles);
-
-        if (loadableFiles.length > 0) {
-            await this.loadFileOrMesh(loadableFiles[0]);
+        this.setImportedFiles(imported, models);
+        if (isPair) {
+            await this.loadFile(files[0], files[1]);
+        } else if (models.length) {
+            await this.loadFileOrMesh(models[0]);
         }
     }
 
-    /**
-     * Recursively read directory
-     */
-    async readDirectory(dirEntry) {
-        const files = [];
+    setImportedFiles(assets, models) {
+        // The editor shares this Map instance.
+        this.fileMap.clear();
+        for (const [path, file] of assets) this.fileMap.set(path, file);
+        this.availableModels = models;
+        this.onFilesLoaded?.(models);
+    }
 
-        return new Promise((resolve, reject) => {
-            const reader = dirEntry.createReader();
-
-            const readEntries = () => {
-                reader.readEntries(async (entries) => {
-                    if (entries.length === 0) {
-                        resolve(files);
-                        return;
-                    }
-
-                    for (const entry of entries) {
-                        if (entry.isFile) {
-                            const file = await getFileFromEntry(entry);
-                            const path = entry.fullPath || entry.name;
-                            this.fileMap.set(path, file);
-                            files.push(file);
-                        } else if (entry.isDirectory) {
-                            const subFiles = await this.readDirectory(entry);
-                            files.push(...subFiles);
-                        }
-                    }
-
-                    readEntries();
-                }, reject);
-            };
-
-            readEntries();
-        });
+    async loadComparisonPrimary({ file, path, assets }, isCurrent) {
+        const sequence = ++this.loadSequence;
+        const [content, models] = await Promise.all([
+            readFileContent(file),
+            this.findAllLoadableFiles([...assets.values()])
+        ]);
+        if (sequence !== this.loadSequence || !isCurrent()) return;
+        const model = await ModelLoaderFactory.loadModel('urdf', content, path, assets, file, { requireMeshes: true });
+        if (sequence !== this.loadSequence || !isCurrent()) return;
+        // Commit the new project only after its URDF parses successfully.
+        this.setImportedFiles(assets, models);
+        this.currentModelFile = file;
+        await this.onModelLoaded?.(model, file, false, null, { keepReference: true });
     }
 
     /**
@@ -283,7 +233,8 @@ export class FileHandler {
     /**
      * Load model file
      */
-    async loadFile(file) {
+    async loadFile(file, referenceFile = null) {
+        const sequence = ++this.loadSequence;
         if (!supportsUSD && isUSDFile(file.name)) {
             alert(window.i18n.t('offlineUsdUnavailable'));
             return;
@@ -330,7 +281,8 @@ export class FileHandler {
                     { usdViewerManager: this.usdViewerManager }
                 );
 
-                this.onModelLoaded?.(model, file, false, null);
+                if (sequence !== this.loadSequence) return;
+                await this.onModelLoaded?.(model, file, false, null);
                 document.getElementById('drop-zone')?.classList.remove('show');
                 document.getElementById('drop-zone')?.classList.remove('drag-over');
                 return;
@@ -338,6 +290,7 @@ export class FileHandler {
 
             // For other files, read text content
             const content = await readFileContent(file);
+            if (sequence !== this.loadSequence) return;
 
             // Detect if USDC binary format (based on content)
             if (this.isUSDCBinaryContent(content)) {
@@ -362,11 +315,12 @@ export class FileHandler {
                 fullPath,  // Use full path instead of just file.name
                 this.fileMap,
                 file,
-                { usdViewerManager: this.usdViewerManager }
+                { usdViewerManager: this.usdViewerManager, requireMeshes: Boolean(referenceFile) }
             );
 
             // Notify model loaded (pass null as snapshot, let main.js create it)
-            this.onModelLoaded?.(model, file, false, null);
+            if (sequence !== this.loadSequence) return;
+            await this.onModelLoaded?.(model, file, false, null, { referenceFile });
 
             document.getElementById('drop-zone')?.classList.remove('show');
             document.getElementById('drop-zone')?.classList.remove('drag-over');
@@ -484,9 +438,11 @@ export class FileHandler {
      * Load single mesh file as model
      */
     async loadMeshAsModel(file, fileName) {
+        const sequence = ++this.loadSequence;
         try {
             const meshObject = await ModelLoaderFactory.loadMeshFileDirect(file, fileName);
 
+            if (sequence !== this.loadSequence) return;
             if (!meshObject) {
                 throw new Error(window.i18n.t('cannotLoadMesh'));
             }

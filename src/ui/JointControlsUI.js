@@ -829,22 +829,18 @@ export class JointControlsUI {
         controllableJoints.forEach(({ name, joint }, i) => {
             const valueInRad = this.fromDisplayValue(joint, values[i]);
 
-            ModelLoaderFactory.setJointAngle(model, name, valueInRad);
-            joint.currentValue = valueInRad;
-
-            // Update slider and display
-            const slider = document.querySelector(`input[data-joint="${name}"]`);
-            if (slider) {
-                slider.value = valueInRad;
-                const control = slider.closest('.joint-control');
-                if (control && control._updateDisplay) {
-                    control._updateDisplay();
-                }
+            if (this.poseController) {
+                this.poseController.setJointValue(name, valueInRad, { source: 'vector', render: false, measure: false });
+            } else {
+                ModelLoaderFactory.setJointAngle(model, name, valueInRad);
+                joint.currentValue = valueInRad;
+                this.sceneManager.constraintManager?.applyConstraints(model, joint);
             }
 
-            // Apply constraints
-            if (this.sceneManager.constraintManager) {
-                this.sceneManager.constraintManager.applyConstraints(model, joint);
+            const slider = document.querySelector(`input[data-joint="${name}"]`);
+            if (slider) {
+                slider.value = joint.currentValue;
+                slider.closest('.joint-control')?._updateDisplay?.();
             }
         });
 

@@ -44,6 +44,14 @@ export async function readDirectory(dirEntry, fileMap) {
     }
 }
 
+export async function readDirectoryHandle(directory, assets, path = directory.name) {
+    for await (const entry of directory.values()) {
+        const childPath = path + '/' + entry.name;
+        if (entry.kind === 'directory') await readDirectoryHandle(entry, assets, childPath);
+        else assets.set(childPath, await entry.getFile());
+    }
+}
+
 /**
  * Get file type from extension
  */

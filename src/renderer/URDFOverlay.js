@@ -1,3 +1,4 @@
+import { disposeModelResources } from './disposeModelResources.js';
 import * as THREE from 'three';
 
 export function isPoseJoint(joint) {
@@ -54,23 +55,8 @@ export class URDFOverlay {
 
     dispose() {
         this.root.removeFromParent();
-        const geometries = new Set();
-        const materials = new Set([this.ghost]);
-        const textures = new Set();
-        for (const [mesh, original] of this.originalMaterials) {
-            geometries.add(mesh.geometry);
-            for (const material of [].concat(original)) {
-                if (material) materials.add(material);
-            }
-        }
-        for (const material of materials) {
-            for (const property of Object.values(material)) {
-                if (property?.isTexture) textures.add(property);
-            }
-            material.dispose();
-        }
-        for (const texture of textures) texture.dispose();
-        for (const geometry of geometries) geometry.dispose();
+        for (const [mesh, original] of this.originalMaterials) mesh.material = original;
+        disposeModelResources(this.root, [this.ghost]);
         this.originalMaterials.clear();
     }
 }

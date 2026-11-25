@@ -4133,36 +4133,54 @@
 
             <div id="floating-files-panel" class="floating-panel">
                 <div class="floating-panel-header">
-                    <span data-i18n="fileList"></span>
+                    <div class="files-tabs" role="tablist" aria-labelledby="toggle-files-panel">
+                        <button id="projects-tab" type="button" role="tab" aria-selected="true" aria-controls="projects-page" data-i18n="projects">Projects</button>
+                        <button id="file-tree-tab" type="button" role="tab" aria-selected="false" aria-controls="model-list" tabindex="-1" data-i18n="projectFileTree">File tree</button>
+                    </div>
                     <button class="panel-maximize-btn" data-panel-id="floating-files-panel">⛶</button>
                     <button class="panel-close-btn" data-panel="floating-files-panel">✕</button>
                 </div>
-                <details id="urdf-comparison" hidden>
-                    <summary data-i18n="compareURDFs">Compare URDFs</summary>
-                    <div class="comparison-fields">
-                        <div class="comparison-slot">
-                            <label for="primary-urdf" data-i18n="comparisonPrimary">Primary URDF</label>
-                            <button class="control-button" type="button" data-open-primary-folder data-i18n="comparisonPrimaryFolder">Choose primary folder</button>
-                            <input type="file" data-primary-folder webkitdirectory multiple hidden>
-                            <select id="primary-urdf" data-primary-select></select>
-                            <output data-primary-status aria-live="polite"></output>
+                <div id="projects-page" role="tabpanel" aria-labelledby="projects-tab">
+                    <section id="project-library" hidden>
+                        <div class="project-actions">
+                            <button type="button" data-add-folder data-i18n="addFolder">Add folder</button>
+                            <button type="button" data-add-files data-i18n="loadFiles">Load Files</button>
                         </div>
-                        <div class="comparison-slot">
-                            <label for="reference-urdf" data-i18n="comparisonReference">Reference URDF</label>
-                            <button class="control-button" type="button" data-open-folder data-i18n="comparisonReferenceFolder">Choose reference folder</button>
-                            <input type="file" data-reference-folder webkitdirectory multiple hidden>
-                            <select id="reference-urdf" data-reference-select></select>
-                            <button class="control-button" type="button" data-open-files data-i18n="comparisonReferenceFiles">Choose reference files</button>
-                            <input type="file" data-reference-files multiple hidden>
+                        <div class="project-empty" data-project-empty>
+                            <i class="library-folder-icon" aria-hidden="true"></i>
+                            <span data-i18n="projectDropHint">Drop robot files or folders here</span>
                         </div>
-                        <label data-overlay-control hidden>
-                            <input type="checkbox" data-show-overlay checked>
-                            <span data-i18n="comparisonShowReference">Show reference</span>
+                        <div data-project-list></div>
+                        <label class="project-field" hidden>
+                            <span class="project-field-label" data-i18n="projectModel">Model</span>
+                            <span class="project-picker">
+                                <span class="picker-filename" data-model-name aria-hidden="true"></span>
+                                <span class="picker-context" data-model-dir aria-hidden="true"></span>
+                                <select data-project-model></select>
+                            </span>
                         </label>
-                        <output data-comparison-status aria-live="polite"></output>
-                    </div>
-                </details>
-                <div class="floating-panel-content" id="model-list">
+                        <output data-project-status aria-live="polite"></output>
+                    </section>
+                    <details id="urdf-comparison" hidden>
+                        <summary><span data-i18n="compareURDFs">Compare URDFs</span></summary>
+                        <div class="comparison-fields">
+                            <label class="project-field reference">
+                                <span class="project-field-label" data-i18n="poseReference">Reference</span>
+                                <span class="project-picker">
+                                    <span class="picker-filename" data-reference-name aria-hidden="true"></span>
+                                    <span class="picker-context" data-reference-project aria-hidden="true"></span>
+                                    <select data-reference-select></select>
+                                </span>
+                            </label>
+                            <label data-overlay-control hidden>
+                                <input type="checkbox" data-show-overlay checked>
+                                <span data-i18n="comparisonShowReference">Show reference</span>
+                            </label>
+                            <output data-comparison-status aria-live="polite"></output>
+                        </div>
+                    </details>
+                </div>
+                <div class="floating-panel-content" id="model-list" role="tabpanel" aria-labelledby="file-tree-tab" tabindex="0" hidden>
                     <div class="empty-state" data-i18n="noFolder"></div>
                 </div>
             </div>

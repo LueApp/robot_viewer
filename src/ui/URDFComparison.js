@@ -2,49 +2,15 @@ import { ModelLoaderFactory } from '../loaders/ModelLoaderFactory.js';
 import { URDFOverlay } from '../renderer/URDFOverlay.js';
 import './urdf-comparison.css';
 
-function urdfSources(assets) {
-    const sources = new Map();
-    for (const [path, file] of assets) {
-        if (/\.urdf$/i.test(file.name)) sources.set(file, { path, file, assets });
-    }
-    return [...sources.values()].sort((a, b) => a.path.localeCompare(b.path));
-}
-
-function folderSources(files) {
-    return urdfSources(new Map(files.map(file => [file.webkitRelativePath || file.name, file])));
-}
-
-function setOptions(select, sources, selected, emptyKey) {
-    const empty = new Option(window.i18n.t(emptyKey), '');
-    empty.dataset.i18n = emptyKey;
-    select.replaceChildren(empty);
-    for (const [i, source] of sources.entries()) select.add(new Option(source.path, String(i)));
-    const index = sources.findIndex(source => source.file === selected?.file);
-    if (selected && index < 0) {
-        // Keep the displayed version identifiable while choosing from a different folder.
-        const current = new Option(`${window.i18n.t('comparisonCurrent')} · ${selected.path}`, 'current');
-        current.disabled = true;
-        select.add(current);
-        select.value = current.value;
-    } else {
-        select.value = index < 0 ? '' : String(index);
-    }
-    select.disabled = !sources.length && !selected;
-    return empty;
-}
-
 export class URDFComparison {
     constructor(scene, fileHandler) {
         this.scene = scene;
         this.fileHandler = fileHandler;
         this.sequence = 0;
-        this.primarySequence = 0;
         this.panel = document.getElementById('urdf-comparison');
         this.get = name => this.panel.querySelector(`[data-${name}]`);
         this.select = this.get('reference-select');
-        this.primarySelect = this.get('primary-select');
-        this.primarySelect.onchange = () => this.loadPrimary(this.primarySources[this.primarySelect.value]);
-        this.select.onchange = () => this.load(this.sources[this.select.value]);
+        this.select.onchange = () => this.load(this.sources.find(source => source.key === this.select.value));
         this.get('show-overlay').onchange = event => {
             if (scene.comparisonOverlay) {
                 scene.comparisonOverlay.root.visible = event.target.checked;
@@ -53,11 +19,7 @@ export class URDFComparison {
             }
         };
         this.setupViewControls();
-        this.bindPicker('open-primary-folder', 'primary-folder', files => this.importPrimaryFiles(files));
-        this.bindPicker('open-folder', 'reference-folder', files => this.importFiles(files));
-        this.bindPicker('open-files', 'reference-files', files => this.importFiles(files));
-        this.setPrimary(null, new Map());
-        this.panel.hidden = false;
+        this.setPrimary(null);
     }
 
     setupViewControls() {
@@ -116,102 +78,62 @@ export class URDFComparison {
         label.textContent = window.i18n.t(label.dataset.i18n);
     }
 
-    bindPicker(buttonName, inputName, onFiles) {
-        const input = this.get(inputName);
-        this.get(buttonName).onclick = () => input.click();
-        input.onchange = () => {
-            if (input.files.length) onFiles(Array.from(input.files));
-            input.value = '';
-        };
+    setPrimary(file, resetReference = false) {
+        this.primary = file;
+        if (!file || resetReference || file === this.active?.file || file === this.loading?.file) this.clearReference();
+        this.panel.hidden = !file;
+        this.refreshProjects();
     }
 
-    setPrimary(file, assets, keepReference = false) {
-        ++this.primarySequence;
-        this.primarySources = file ? urdfSources(new Map(assets)) : [];
-        this.primary = this.primarySources.find(source => source.file === file);
-        if (file && !this.primary) {
-            this.primary = { file, path: file.name, assets: new Map(assets) };
-            this.primarySources.push(this.primary);
-        }
-        this.workspace = this.primarySources.filter(source => source !== this.primary);
-        this.renderPrimaryOptions();
-        this.get('primary-status').textContent = '';
-        if (!keepReference) {
+    clearReference() {
+        ++this.sequence;
+        this.loading = this.active = null;
+        if (this.scene.comparisonOverlay) this.scene.setComparisonOverlay(null);
+        this.get('overlay-control').hidden = true;
+        this.get('comparison-status').textContent = '';
+    }
+
+    refreshProjects() {
+        const projects = this.fileHandler.projects;
+        if (this.loading && !projects.has(this.loading.project.id)) {
             ++this.sequence;
-            if (this.scene.comparisonOverlay) this.scene.setComparisonOverlay(null);
-            this.stagedOverlay?.dispose();
-            this.stagedOverlay = null;
-            this.active = null;
             this.loading = null;
-            this.referenceSources = [];
-            this.panel.open = false;
-            this.get('overlay-control').hidden = true;
             this.get('comparison-status').textContent = '';
         }
-        this.renderReferenceOptions();
-    }
-
-    renderPrimaryOptions() {
-        setOptions(this.primarySelect, this.primarySources, this.primary, 'comparisonChoosePrimary').disabled = true;
-    }
-
-    renderReferenceOptions() {
-        this.sources = this.referenceSources.length ? this.referenceSources : this.workspace;
-        setOptions(this.select, this.sources, this.loading || this.active, 'comparisonNone');
-    }
-
-    importPrimaryFiles(files) {
-        ++this.primarySequence;
-        const imported = folderSources(files);
-        if (!imported.length) {
-            this.get('primary-status').textContent = window.i18n.t('comparisonNoURDF');
-            this.renderPrimaryOptions();
-            return;
+        if (this.active && !projects.has(this.active.project.id)) {
+            this.active = null;
+            this.scene.setComparisonOverlay(null);
+            this.get('overlay-control').hidden = true;
         }
-        this.primarySources = imported;
-        this.renderPrimaryOptions();
-        if (imported.length === 1) return this.loadPrimary(imported[0]);
-        this.get('primary-status').textContent = window.i18n.t('comparisonChoosePrimary');
-    }
-
-    async loadPrimary(source) {
-        const sequence = ++this.primarySequence;
-        const isCurrent = () => sequence === this.primarySequence;
-        const status = this.get('primary-status');
-        this.primarySelect.value = String(this.primarySources.indexOf(source));
-        status.textContent = window.i18n.t('comparisonLoadingPrimary');
-        try {
-            await this.fileHandler.loadComparisonPrimary(source, isCurrent);
-        } catch (error) {
-            if (isCurrent()) {
-                status.textContent = `${window.i18n.t('loadFailed')} · ${source.path} · ${error.message}`;
-                this.renderPrimaryOptions();
+        this.sources = [];
+        const empty = new Option(window.i18n.t('comparisonNone'), '');
+        empty.dataset.i18n = 'comparisonNone';
+        this.select.replaceChildren(empty);
+        for (const project of projects.values()) {
+            const group = document.createElement('optgroup');
+            group.label = project.name;
+            for (const model of project.models) {
+                const path = model.path;
+                const file = project.assets.get(path);
+                if (!file || !/\.urdf$/i.test(file.name) || file === this.primary) continue;
+                const source = { project, path, file, assets: project.assets, key: project.id + '/' + path };
+                this.sources.push(source);
+                const relative = project.loose ? path : path.replace(/^\/?[^/]+\//, '');
+                const label = path === project.name ? path : project.name + ' / ' + relative;
+                group.append(new Option(label, source.key));
             }
+            if (group.children.length) this.select.append(group);
         }
+        const chosen = this.loading || this.active;
+        this.select.value = chosen?.key || '';
+        this.showReferenceName(chosen);
+        this.select.disabled = !this.sources.length;
     }
 
-    importFiles(files) {
-        ++this.sequence;
-        this.loading = null;
-        const imported = folderSources(files);
-        if (!imported.length) {
-            this.get('comparison-status').textContent = window.i18n.t('comparisonNoURDF');
-            this.renderReferenceOptions();
-            return;
-        }
-        this.referenceSources = imported;
-        this.renderReferenceOptions();
-        if (imported.length === 1) return this.load(imported[0]);
-        this.get('comparison-status').textContent = window.i18n.t('comparisonChoose');
-    }
-
-    // A reference chosen first is ready to attach as soon as the primary enters the scene.
-    attachStagedReference() {
-        if (!this.stagedOverlay) return;
-        this.scene.setComparisonOverlay(this.stagedOverlay);
-        this.stagedOverlay = null;
-        this.get('overlay-control').hidden = false;
-        this.get('comparison-status').textContent = '';
+    showReferenceName(source) {
+        this.get('reference-name').textContent = source?.file.name || window.i18n.t('comparisonNone');
+        this.get('reference-project').textContent = source?.project.name || '';
+        this.select.title = this.select.selectedOptions[0]?.text || '';
     }
 
     async load(source) {
@@ -222,7 +144,8 @@ export class URDFComparison {
         status.textContent = '';
         let overlay = null;
         if (source) {
-            this.select.value = String(this.sources.indexOf(source));
+            this.select.value = source.key;
+            this.showReferenceName(source);
             status.textContent = window.i18n.t('comparisonLoading');
             try {
                 const content = await source.file.text();
@@ -237,19 +160,17 @@ export class URDFComparison {
                 if (sequence === this.sequence) {
                     this.loading = null;
                     status.textContent = `${window.i18n.t('loadFailed')} · ${source.path} · ${error.message}`;
-                    this.renderReferenceOptions();
+                    this.refreshProjects();
                 }
                 return;
             }
         }
-        this.stagedOverlay?.dispose();
-        this.stagedOverlay = this.primary ? null : overlay;
-        if (this.primary) this.scene.setComparisonOverlay(overlay);
+        this.scene.setComparisonOverlay(overlay);
         this.loading = null;
         this.active = source;
-        this.renderReferenceOptions();
-        this.get('overlay-control').hidden = !source || !this.primary;
+        this.refreshProjects();
+        this.get('overlay-control').hidden = !source;
         this.get('show-overlay').checked = true;
-        status.textContent = this.stagedOverlay ? window.i18n.t('comparisonWaitingPrimary') : '';
+        status.textContent = '';
     }
 }

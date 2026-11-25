@@ -2,9 +2,10 @@
  * FileHandler - File handling module
  * Handles file drag-drop, loading, type detection, etc.
  */
+import { disposeModelResources } from '../renderer/disposeModelResources.js';
 import * as THREE from 'three';
 import { ModelLoaderFactory } from '../loaders/ModelLoaderFactory.js';
-import { readFileContent, getFileFromEntry, readDirectory, getFileTypeFromExtension } from '../utils/FileUtils.js';
+import { readFileContent, getFileFromEntry, readDirectory, readDirectoryHandle, getFileTypeFromExtension } from '../utils/FileUtils.js';
 import { supportsUSD, isUSDFile } from '../config/features.js';
 
 export class FileHandler {
@@ -12,6 +13,11 @@ export class FileHandler {
         this.fileMap = new Map();
         this.availableModels = [];
         this.loadSequence = 0;
+        this.projects = new Map();
+        this.nextProjectId = 1;
+        this.selectedProject = null;
+        this.activeProject = null;
+        this.projectStatus = '';
         this.currentModelFile = null;
         this.onModelLoaded = null; // Callback function
         this.usdViewerManager = null; // USD viewer manager (lazy loaded)
@@ -65,7 +71,7 @@ export class FileHandler {
             dragCounter = 0;
             const dropZone = document.getElementById('drop-zone');
             if (dropZone) dropZone.classList.remove('drag-over');
-            this.handleDrop(e);
+            this.handleDrop(e).catch(error => this.reportLoadError(window.i18n.t('projects'), error));
         }, false);
     }
 
@@ -79,66 +85,155 @@ export class FileHandler {
             await this.onInertiaReport(droppedFiles[0]);
             return;
         }
-        const sequence = ++this.loadSequence;
-        const entries = Array.from(e.dataTransfer.items || [], item => item.webkitGetAsEntry?.()).filter(Boolean);
-        const imported = new Map();
-        const files = [];
-        if (entries.length) {
-            for (const entry of entries) {
-                if (entry.isDirectory) {
-                    files.push(...await readDirectory(entry, imported));
-                } else if (entry.isFile) {
-                    const file = await getFileFromEntry(entry);
-                    imported.set(entry.fullPath || file.name, file);
-                    files.push(file);
-                }
-            }
-        } else {
-            for (const file of droppedFiles) {
-                imported.set(file.webkitRelativePath || file.name, file);
-                files.push(file);
+        // A browser grants access to dropped items during the event. Capture both
+        // APIs before awaiting directory reads, including in the standalone HTML.
+        const items = Array.from(e.dataTransfer.items || []).filter(item => item.kind === 'file');
+        const entries = items.map(item => item.webkitGetAsEntry?.());
+        const handles = await Promise.all(items.map(item => item.getAsFileSystemHandle?.().catch(() => null)));
+        if (!handles.some(handle => handle?.kind === 'directory') && !entries.some(entry => entry?.isDirectory)) {
+            return this.importFiles(droppedFiles);
+        }
+        const groups = [];
+        const loose = [];
+        for (const [i, entry] of entries.entries()) {
+            const handle = handles[i];
+            const assets = new Map();
+            if (handle?.kind === 'directory') {
+                await readDirectoryHandle(handle, assets);
+                groups.push({ name: handle.name, assets });
+            } else if (entry?.isDirectory) {
+                await readDirectory(entry, assets);
+                groups.push({ name: entry.name, assets });
+            } else if (handle?.kind === 'file') {
+                loose.push(await handle.getFile());
+            } else if (entry?.isFile) {
+                loose.push(await getFileFromEntry(entry));
+            } else if (droppedFiles[i]) {
+                loose.push(droppedFiles[i]);
             }
         }
-        const models = await this.findAllLoadableFiles(files);
-        if (!files.length || sequence !== this.loadSequence) return;
+        if (loose.length) groups.push(this.looseProject(loose));
+        return this.importProjects(groups);
+    }
 
-        // Selecting two loose URDFs is a pair import. A folder can hold many independent robots.
-        const isPair = files.length === 2 && files.every(f => /\.urdf$/i.test(f.name) && !f.webkitRelativePath)
-            && !entries.some(entry => entry.isDirectory);
-        if (isPair && imported.size === 1) {
-            // Browsers can give two files dragged from different windows the same path.
-            imported.clear();
-            files.forEach((file, i) => imported.set(`${i + 1}/${file.name}`, file));
+    looseProject(files) {
+        const assets = new Map();
+        for (const [index, file] of files.entries()) {
+            const path = assets.has(file.name) ? `${index + 1}/${file.name}` : file.name;
+            assets.set(path, file);
         }
-        this.setImportedFiles(imported, models);
-        if (isPair) {
-            await this.loadFile(files[0], files[1]);
-        } else if (models.length) {
-            await this.loadFileOrMesh(models[0]);
+        return { name: files[0].name, assets, loose: true };
+    }
+
+    importFiles(files) {
+        if (!files.length) return;
+        const folders = new Map();
+        const loose = [];
+        for (const file of files) {
+            if (!file.webkitRelativePath) {
+                loose.push(file);
+                continue;
+            }
+            const name = file.webkitRelativePath.split('/')[0];
+            if (!folders.has(name)) folders.set(name, { name, assets: new Map() });
+            folders.get(name).assets.set(file.webkitRelativePath, file);
+        }
+        const groups = [...folders.values()];
+        if (loose.length) groups.push(this.looseProject(loose));
+        const pair = !folders.size && loose.length === 2 && loose.every(file => /\.urdf$/i.test(file.name));
+        return this.importProjects(groups, { open: !folders.size, primaryFile: pair ? loose[0] : null, referenceFile: pair ? loose[1] : null });
+    }
+
+    async importProjects(groups, { open = false, primaryFile, referenceFile } = {}) {
+        const sequence = this.loadSequence;
+        const added = [];
+        for (const { name, assets, loose = false } of groups) {
+            const models = await this.findAllLoadableFiles([...assets.values()]);
+            if (!models.length) continue;
+            const paths = new Map([...assets].map(([path, file]) => [file, path]));
+            for (const model of models) model.path = paths.get(model.file);
+            let label = name;
+            for (let n = 2; [...this.projects.values()].some(p => p.name === label); n++) label = `${name} (${n})`;
+            const project = { id: String(this.nextProjectId++), name: label, assets, loose, models, lastPath: null };
+            this.projects.set(project.id, project);
+            added.push(project);
+        }
+        if (!added.length) this.projectStatus = window.i18n.t('noSupportedFiles');
+        this.onProjectsChanged?.();
+        if (added.length && sequence === this.loadSequence && (open || !this.selectedProject)) {
+            const project = added[0];
+            const initial = primaryFile && project.models.find(model => model.file === primaryFile);
+            await this.selectProject(project, initial?.path, referenceFile);
         }
     }
 
-    setImportedFiles(assets, models) {
-        // The editor shares this Map instance.
-        this.fileMap.clear();
-        for (const [path, file] of assets) this.fileMap.set(path, file);
-        this.availableModels = models;
-        this.onFilesLoaded?.(models);
+    async selectProject(project, path, referenceFile = null) {
+        if (!project || !this.projects.has(project.id)) return;
+        this.selectedProject = project;
+        const info = project.models.find(model => model.path === (path || project.lastPath)) || project.models[0];
+        const file = project.assets.get(info.path);
+        this.requestedPath = info.path;
+        if (file === this.currentModelFile && project === this.activeProject && !referenceFile) {
+            ++this.loadSequence;
+            this.requestedPath = null;
+            this.projectStatus = '';
+            this.onProjectsChanged?.();
+            return;
+        }
+        this.projectStatus = window.i18n.t('loading') + ' · ' + info.name;
+        this.onProjectsChanged?.();
+        if (info.category === 'mesh') await this.loadMeshAsModel(file, file.name, project, info.path);
+        else await this.loadFile(file, referenceFile, project, info.path);
     }
 
-    async loadComparisonPrimary({ file, path, assets }, isCurrent) {
-        const sequence = ++this.loadSequence;
-        const [content, models] = await Promise.all([
-            readFileContent(file),
-            this.findAllLoadableFiles([...assets.values()])
-        ]);
-        if (sequence !== this.loadSequence || !isCurrent()) return;
-        const model = await ModelLoaderFactory.loadModel('urdf', content, path, assets, file, { requireMeshes: true });
-        if (sequence !== this.loadSequence || !isCurrent()) return;
-        // Commit the new project only after its URDF parses successfully.
-        this.setImportedFiles(assets, models);
+    commitSelection(project, path, file) {
+        if (project) {
+            project.lastPath = path;
+            const entry = project.models.find(model => model.path === path);
+            if (entry) entry.file = file;
+            this.fileMap = project.assets;
+            this.availableModels = project.models;
+            this.activeProject = this.selectedProject = project;
+            this.onFilesLoaded?.(project.models);
+        }
         this.currentModelFile = file;
-        await this.onModelLoaded?.(model, file, false, null, { keepReference: true });
+        this.requestedPath = null;
+        this.projectStatus = '';
+        this.onProjectsChanged?.();
+    }
+
+    async removeProject(project) {
+        if (!this.projects.delete(project.id)) return;
+        const selected = this.selectedProject === project;
+        const active = this.activeProject === project;
+        if (selected) {
+            ++this.loadSequence;
+            this.requestedPath = null;
+            this.selectedProject = active ? null : this.activeProject;
+            this.projectStatus = '';
+        }
+        if (active) {
+            this.activeProject = null;
+            this.fileMap = new Map();
+            this.availableModels = [];
+            this.currentModelFile = null;
+            this.onModelCleared?.();
+            this.onFilesLoaded?.([]);
+        }
+        project.assets.clear();
+        project.models.length = 0;
+        this.onProjectsChanged?.();
+        if (this.activeProject) return;
+        // An inactive or pending project can be removed without interrupting
+        // a different project that is still opening.
+        if (!active && this.selectedProject) return;
+        const remaining = new Set([this.selectedProject, ...this.projects.values()]);
+        for (const next of remaining) {
+            if (!next || !this.projects.has(next.id)) continue;
+            const expectedLoad = this.loadSequence + 1;
+            await this.selectProject(next);
+            if (this.activeProject || this.loadSequence !== expectedLoad) break;
+        }
     }
 
     /**
@@ -220,127 +315,47 @@ export class FileHandler {
     }
 
     /**
-     * Load file or mesh
+     * Load and activate a model after its assets have resolved.
      */
-    async loadFileOrMesh(fileInfo) {
-        if (fileInfo.category === 'model') {
-            await this.loadFile(fileInfo.file);
-        } else if (fileInfo.category === 'mesh') {
-            await this.loadMeshAsModel(fileInfo.file, fileInfo.name);
-        }
-    }
-
-    /**
-     * Load model file
-     */
-    async loadFile(file, referenceFile = null) {
+    async loadFile(file, referenceFile = null, project = this.activeProject, path = null) {
         const sequence = ++this.loadSequence;
         if (!supportsUSD && isUSDFile(file.name)) {
             alert(window.i18n.t('offlineUsdUnavailable'));
             return;
         }
-        this.currentModelFile = file;
-
+        const assets = project?.assets || this.fileMap;
+        path ??= [...assets].find(([, asset]) => asset === file)?.[0] || file.name;
         try {
-            const fileName = file.name.toLowerCase();
-
-            // Get the full path from fileMap
-            let fullPath = file.name;
-            for (const [path, f] of this.fileMap.entries()) {
-                if (f === file) {
-                    fullPath = path;
-                    break;
-                }
-            }
-
-            // Handle USD format files (all USD formats use WASM)
-            const isUSD = fileName.endsWith('.usd') || fileName.endsWith('.usda') ||
-                         fileName.endsWith('.usdc') || fileName.endsWith('.usdz');
-            if (isUSD) {
-                // Ensure USD viewer is initialized
-                if (!this.usdViewerManager && this.usdViewerInitializer) {
-                    try {
-                        await this.usdViewerInitializer();
-                    } catch (error) {
-                        console.error('USD viewer initialization failed:', error);
-                        return;
-                    }
-                }
-
-                if (this.fileMap.size === 0) {
-                    this.fileMap.set(file.name, file);
-                }
-
-                // USD files need File object passed
-                const model = await ModelLoaderFactory.loadModel(
-                    'usd',
-                    null,
-                    fullPath,
-                    this.fileMap,
-                    file,
-                    { usdViewerManager: this.usdViewerManager }
-                );
-
-                if (sequence !== this.loadSequence) return;
-                await this.onModelLoaded?.(model, file, false, null);
-                document.getElementById('drop-zone')?.classList.remove('show');
-                document.getElementById('drop-zone')?.classList.remove('drag-over');
-                return;
-            }
-
-            // For other files, read text content
-            const content = await readFileContent(file);
+            const usd = isUSDFile(file.name);
+            if (usd && !this.usdViewerManager) await this.usdViewerInitializer?.();
+            const content = usd ? null : await readFileContent(file);
             if (sequence !== this.loadSequence) return;
-
-            // Detect if USDC binary format (based on content)
-            if (this.isUSDCBinaryContent(content)) {
-                console.error('Cannot load USDC binary format, please convert to USDZ or USDA');
+            if (this.isUSDCBinaryContent(content)) throw new Error('Binary USDC content requires a USD file extension.');
+            const type = ModelLoaderFactory.detectFileType(file.name, content);
+            if (!type) throw new Error(window.i18n.t('unsupportedFormat'));
+            if (!assets.size) assets.set(path, file);
+            const model = await ModelLoaderFactory.loadModel(type, content, path, assets, file, {
+                usdViewerManager: this.usdViewerManager, requireMeshes: Boolean((project && !project.loose) || referenceFile)
+            });
+            if (sequence !== this.loadSequence) {
+                disposeModelResources(model?.threeObject);
                 return;
             }
-
-            const fileType = ModelLoaderFactory.detectFileType(file.name, content);
-
-            if (!fileType) {
-                console.error(`${window.i18n.t('unsupportedFormat')}: ${file.name}`);
-                return;
-            }
-
-            if (this.fileMap.size === 0) {
-                this.fileMap.set(file.name, file);
-            }
-
-            const model = await ModelLoaderFactory.loadModel(
-                fileType,
-                content,
-                fullPath,  // Use full path instead of just file.name
-                this.fileMap,
-                file,
-                { usdViewerManager: this.usdViewerManager, requireMeshes: Boolean(referenceFile) }
-            );
-
-            // Notify model loaded (pass null as snapshot, let main.js create it)
-            if (sequence !== this.loadSequence) return;
+            this.commitSelection(project, path, file);
             await this.onModelLoaded?.(model, file, false, null, { referenceFile });
-
-            document.getElementById('drop-zone')?.classList.remove('show');
-            document.getElementById('drop-zone')?.classList.remove('drag-over');
-
+            document.getElementById('drop-zone')?.classList.remove('show', 'drag-over');
         } catch (error) {
-            console.error('Failed to load file:', error);
-
-            // If error message contains USDC related content
-            if (error.message && (error.message.includes('USDC') || error.message.includes('binary format'))) {
-                console.error('Cannot load USDC binary format, please convert to USDZ or USDA');
-            } else {
-                console.error(`${window.i18n.t('loadFailed')}: ${error.message}`);
-            }
-
-            // Remove snapshot if exists
-            const snapshot = document.getElementById('canvas-snapshot');
-            if (snapshot?.parentNode) {
-                snapshot.parentNode.removeChild(snapshot);
-            }
+            if (sequence === this.loadSequence) this.reportLoadError(path, error);
         }
+    }
+
+    reportLoadError(path, error) {
+        console.error('Failed to load file:', error);
+        this.projectStatus = `${window.i18n.t('loadFailed')} · ${path} · ${error.message}`;
+        if (this.activeProject && this.currentModelFile) {
+            this.projectStatus += ` · ${window.i18n.t('comparisonCurrent')} · ${this.activeProject.name} / ${this.currentModelFile.name}`;
+        }
+        this.onProjectsChanged?.();
     }
 
     /**
@@ -437,12 +452,15 @@ export class FileHandler {
     /**
      * Load single mesh file as model
      */
-    async loadMeshAsModel(file, fileName) {
+    async loadMeshAsModel(file, fileName, project = this.activeProject, path = fileName) {
         const sequence = ++this.loadSequence;
         try {
             const meshObject = await ModelLoaderFactory.loadMeshFileDirect(file, fileName);
 
-            if (sequence !== this.loadSequence) return;
+            if (sequence !== this.loadSequence) {
+                disposeModelResources(meshObject);
+                return;
+            }
             if (!meshObject) {
                 throw new Error(window.i18n.t('cannotLoadMesh'));
             }
@@ -460,6 +478,7 @@ export class FileHandler {
                             side: oldMaterial.side,
                             shininess: 30
                         });
+                        oldMaterial.dispose();
                         if (child.material.map) {
                             child.material.map.colorSpace = THREE.SRGBColorSpace;
                         }
@@ -487,16 +506,11 @@ export class FileHandler {
                 threeObject: meshObject
             };
 
-            this.currentModelFile = file;
-            this.onModelLoaded?.(simpleMeshModel, file, true, null);
+            this.commitSelection(project, path, file);
+            await this.onModelLoaded?.(simpleMeshModel, file, true, null);
 
         } catch (error) {
-            console.error('Failed to load mesh file:', error);
-
-            const snapshot = document.getElementById('canvas-snapshot');
-            if (snapshot?.parentNode) {
-                snapshot.parentNode.removeChild(snapshot);
-            }
+            if (sequence === this.loadSequence) this.reportLoadError(path, error);
         }
     }
 

@@ -16,6 +16,7 @@ export class CodeEditorManager {
             defaultFileType: 'urdf' // urdf, mjcf, usd
         };
         this.onReload = null; // Reload callback
+        this.fileReadSequence = 0;
         this.fileMap = null; // File map reference
         this.contentChangeListeners = new Set();
     }
@@ -247,7 +248,9 @@ export class CodeEditorManager {
         }
 
         try {
+            const sequence = ++this.fileReadSequence;
             const content = await readFileContent(file);
+            if (sequence !== this.fileReadSequence) return;
 
             // Save file reference and original content
             this.editorState.currentFile = file;
@@ -420,6 +423,7 @@ export class CodeEditorManager {
      * Clear editor content
      */
     clearEditor() {
+        ++this.fileReadSequence;
         if (!this.codeEditorInstance) return;
 
         // Clear editor content

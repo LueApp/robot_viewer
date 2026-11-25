@@ -154,10 +154,9 @@ try {
             ? path.join(repo, file.startsWith('offline-demo.') ? 'tools/offline/examples' : 'public/examples', file)
             : path.join(bundle, 'samples', file), 'utf8') })));
         await evaluate(`(async () => {
-            app.fileHandler.fileMap.clear();
             const entries = ${JSON.stringify(entries)};
-            for (const entry of entries) app.fileHandler.fileMap.set(entry.name, new File([entry.content], entry.name.split('/').pop()));
-            await app.fileHandler.loadFile(app.fileHandler.fileMap.get(${JSON.stringify(name)}));
+            const assets = new Map(entries.map(entry => [entry.name, new File([entry.content], entry.name.split('/').pop())]));
+            await app.fileHandler.importProjects([{ name: entries[0].name, assets }], { open: true });
         })()`);
         if (!/\.usd[acz]?$/i.test(name)) await waitForModelView();
     };
@@ -295,7 +294,7 @@ try {
             document.querySelector('[data-show-overlay]').click();
             return {
                 primary: app.codeEditorManager.editorState.currentFile.name,
-                reference: document.querySelector('[data-reference-select]').selectedOptions[0].textContent,
+                reference: app.urdfComparison.active.file.name,
                 aligned: primary.matrixWorld.equals(overlay.root.matrixWorld),
                 initial, primaryEdit, referenceEdit, alignedPose, fromReference, limited, fromPrimary, millimeters, missing,
                 wipe, ghost, split: scene.comparisonSplit, opacity: overlay.ghost.opacity, tools,
@@ -339,24 +338,6 @@ try {
             assert.deepEqual(drag, { grabbed: 'motor_joint', moved: [side === 'primary', side === 'reference'] });
         }
         console.log('PASS: viewport drag changes only the robot visible on the selected side of the wipe');
-        // A separate version folder can reuse the primary file name and contain asynchronous meshes.
-        const folder = path.join(temporary, 'v2');
-        await fs.mkdir(path.join(folder, 'meshes'), { recursive: true });
-        await fs.writeFile(path.join(folder, 'joint-zero-demo.urdf'),
-            '<robot name="v2"><link name="base"><visual><geometry><mesh filename="package://bot/meshes/body.obj"/></geometry></visual></link></robot>');
-        await fs.writeFile(path.join(folder, 'meshes/body.obj'), 'v 0 0 0\nv 3 0 0\nv 0 2 0\nf 1 2 3\n');
-        const folderInput = await call('DOM.querySelector', { nodeId: root.nodeId, selector: '[data-reference-folder]' });
-        await call('DOM.setFileInputFiles', { nodeId: folderInput.nodeId, files: [folder] });
-        await until(() => evaluate('app.sceneManager.comparisonOverlay?.root.robotName === "v2"'), 'reference folder import');
-        assert.equal(await evaluate(`(() => {
-            const overlay = app.sceneManager.comparisonOverlay;
-            let meshes = 0;
-            overlay.root.traverse(o => { if (o.isMesh && o.material === overlay.originalMaterials.get(o)) meshes++; });
-            return meshes;
-        })()`), 1);
-        await evaluate('app.urdfComparison.importFiles([new File(["<invalid/>"], "broken.urdf")])');
-        assert.ok(await evaluate('document.querySelector("[data-comparison-status]").textContent.includes("broken.urdf")'));
-        assert.equal(await evaluate('app.sceneManager.comparisonOverlay.root.robotName'), 'v2');
         await evaluate(`(() => {
             const select = document.querySelector('[data-reference-select]');
             select.value = '';
@@ -364,7 +345,7 @@ try {
             app.sceneManager.setUp('+Z');
         })()`);
         assert.equal(await evaluate('app.sceneManager.comparisonOverlay === null && app.currentModel.joints.has("motor_joint")'), true);
-        console.log('PASS: aligned wipe and shaded overlay, independent and linked poses, prismatic units, folder assets, failed replacement and removal');
+        console.log('PASS: aligned wipe and shaded overlay, independent and linked poses, prismatic units and returning to single-robot viewing');
 
         // Import one project containing two revisions of the same ROS package.
         const project = path.join(temporary, 'versions');
@@ -379,11 +360,13 @@ try {
         await evaluate('app.fileTreeView.triggerFileLoad(true)');
         const projectInput = await call('DOM.querySelector', { nodeId: root.nodeId, selector: 'body > input[webkitdirectory]' });
         await call('DOM.setFileInputFiles', { nodeId: projectInput.nodeId, files: [project] });
-        await until(() => evaluate('app.fileHandler.currentModelFile?.name === "robot.urdf" && app.urdfComparison.sources.length === 1'), 'multi-version project');
+        await until(() => evaluate('Array.from(document.querySelectorAll("[data-project-id]")).some(b => b.textContent === "versions")'), 'multi-version project');
+        await evaluate('Array.from(document.querySelectorAll("[data-project-id]")).find(b => b.textContent === "versions").click()');
+        await until(() => evaluate('app.fileHandler.activeProject?.name === "versions"'), 'view project');
         await waitForModelView();
         await evaluate(`(() => {
             const select = document.querySelector('[data-reference-select]');
-            select.value = '0';
+            select.value = [...select.options].find(option => option.parentElement.label === 'versions').value;
             select.dispatchEvent(new Event('change'));
         })()`);
         await until(() => evaluate('Boolean(app.sceneManager.comparisonOverlay)'), 'project reference');
@@ -404,7 +387,7 @@ try {
         console.log('PASS: same-named URDFs use their own package meshes and editing the primary preserves the reference');
     }
     await load('offline-demo.xacro');
-    assert.equal(await evaluate('!app.sceneManager.comparisonOverlay && document.querySelector("[data-primary-select]").disabled'), true);
+    assert.equal(await evaluate('!app.sceneManager.comparisonOverlay && document.querySelector("#urdf-comparison").hidden'), true);
     assert.equal(await evaluate('app.currentModel.joints.has("arm_joint")'), true);
     console.log('PASS: Xacro expansion and loading');
     await load('offline-demo.xml');

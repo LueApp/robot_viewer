@@ -56,7 +56,6 @@ class App {
         this.currentMJCFFile = null;
         this.currentMJCFModel = null;
         this.angleUnit = 'rad';
-        this.vscodeFileMap = new Map(); // Store VSCode files
     }
 
     /**
@@ -75,46 +74,15 @@ class App {
             file.vscodeDirectory = fileInfo.directory;
             file.vscodePath = fileInfo.path;
 
-            // Add to file map
-            this.fileHandler.fileMap.set(fileInfo.name, file);
-            this.fileHandler.fileMap.set(fileInfo.path, file);
-            this.vscodeFileMap.set(fileInfo.name, fileInfo);
-
-            // Load the model
-            await this.fileHandler.loadFile(file);
-
-            // Update file tree
-            const loadableFiles = [{
-                file: file,
-                name: fileInfo.name,
-                type: this.detectFileType(fileInfo.name),
-                path: fileInfo.path,
-                category: 'model',
-                ext: fileInfo.name.split('.').pop().toLowerCase()
-            }];
-
-            this.fileHandler.availableModels = loadableFiles;
-            if (this.fileTreeView) {
-                this.fileTreeView.updateFileTree(loadableFiles, this.fileHandler.fileMap);
-            }
+            await this.fileHandler.importProjects([{
+                name: fileInfo.name, loose: true, assets: new Map([[fileInfo.path || fileInfo.name, file]])
+            }], { open: true });
 
             vscodeAdapter.log(`Model loaded successfully: ${fileInfo.name}`);
         } catch (error) {
             console.error('Failed to load model from VSCode:', error);
             vscodeAdapter.showError(`Failed to load model: ${error.message}`);
         }
-    }
-
-    /**
-     * Detect file type from filename
-     */
-    detectFileType(filename) {
-        const ext = filename.split('.').pop().toLowerCase();
-        if (['urdf', 'xacro'].includes(ext)) return 'urdf';
-        if (['mjcf', 'xml'].includes(ext)) return 'mjcf';
-        if (['usd', 'usda', 'usdc', 'usdz'].includes(ext)) return 'usd';
-        if (['obj', 'stl', 'dae', 'gltf', 'glb'].includes(ext)) return 'mesh';
-        return 'unknown';
     }
 
     /**
@@ -153,6 +121,7 @@ class App {
             });
 
             this.fileHandler.onFilesLoaded = (files) => {
+                if (this.codeEditorManager) this.codeEditorManager.fileMap = this.fileHandler.getFileMap();
                 if (this.fileTreeView) {
                     this.fileTreeView.updateFileTree(files, this.fileHandler.getFileMap());
                 }
@@ -179,6 +148,12 @@ class App {
 
             // Initialize file tree view
             this.fileTreeView = new FileTreeView();
+            this.fileTreeView.setupProjects(this.fileHandler);
+            this.fileHandler.onProjectsChanged = () => {
+                this.fileTreeView.renderProjects();
+                this.urdfComparison.refreshProjects();
+            };
+            this.fileHandler.onModelCleared = () => this.clearCurrentModel();
             this.fileTreeView.onFileClick = (fileInfo) => {
                 this.handleFileClick(fileInfo);
             };
@@ -260,9 +235,6 @@ class App {
                 if (skipTreeUpdate) {
                     this._isReloading = true;
                 }
-
-                // Temporarily update currentModelFile
-                this.fileHandler.currentModelFile = file;
 
                 await this.fileHandler.loadFile(file);
 
@@ -351,14 +323,36 @@ class App {
         }
     }
 
+    clearCurrentModel() {
+        this.urdfComparison.setPrimary(null);
+        this.mujocoSimulationManager?.clearScene();
+        this.measurementController?.clearMeasurement();
+        this.inertiaReportPanel?.setModel(null);
+        this.endMoveControls?.setModel(null);
+        this.urdfTransformEditor?.setModel(null, null);
+        this.animationWorkspace?.setModel(null);
+        this.codeEditorManager?.clearEditor();
+        this.usdViewerManager?.clear();
+        this.usdViewerManager?.hide();
+        if (this.sceneManager.currentModel) this.sceneManager.removeModel(this.sceneManager.currentModel);
+        this.currentModel = this.currentMJCFFile = this.currentMJCFModel = null;
+        this.modelGraphView?.drawModelGraph(null);
+        this.jointControlsUI?.setupJointControls(null);
+        this.gravityUI?.update();
+        document.querySelectorAll('#canvas-snapshot').forEach(snapshot => snapshot.remove());
+        document.getElementById('canvas').style.display = 'block';
+        document.getElementById('mujoco-simulation-bar').style.display = 'none';
+        document.getElementById('status-info')?.replaceChildren();
+        this.sceneManager.redraw();
+    }
+
     /**
      * Handle model loaded
      */
-    async handleModelLoaded(model, file, isMesh = false, snapshot = null, { referenceFile, keepReference = false } = {}) {
+    async handleModelLoaded(model, file, isMesh = false, snapshot = null, { referenceFile } = {}) {
         const isURDF = model.threeObject?.isURDFRobot && /\.urdf$/i.test(file.name);
-        const waitingForPrimary = !this.urdfComparison.primary && this.urdfComparison.referenceSources.length > 0;
-        const keepComparison = Boolean(isURDF && !referenceFile && (keepReference || this._isReloading || waitingForPrimary));
-        this.urdfComparison.setPrimary(isURDF ? file : null, this.fileHandler.getFileMap(), keepComparison);
+        this.urdfComparison.setPrimary(isURDF ? file : null, Boolean(referenceFile));
+        this.measurementController?.clearMeasurement();
         this.inertiaReportPanel?.setModel(null);
         this.urdfTransformEditor?.setModel(model, file);
 
@@ -419,6 +413,10 @@ class App {
             this.currentMJCFModel = null;
         }
 
+        if (this.sceneManager.currentModel) {
+            this.sceneManager.removeModel(this.sceneManager.currentModel, Boolean(this.sceneManager.comparisonOverlay));
+        }
+
         // Check if USD WASM model
         if (model?.userData?.isUSDWASM) {
             // Hide Three.js canvas, show USD viewer
@@ -472,12 +470,6 @@ class App {
         const graphPanel = document.getElementById('graph-panel');
         if (jointPanel) jointPanel.style.display = '';
         if (graphPanel) graphPanel.style.display = '';
-
-        // Clear old model
-        if (this.currentModel) {
-            this.sceneManager.removeModel(this.currentModel, keepComparison);
-            this.currentModel = null;
-        }
 
         this.currentModel = model;
         this.animationWorkspace?.setModel(isMesh ? null : model, file.name);
@@ -558,7 +550,6 @@ class App {
 
         // Add to scene (render in background under snapshot)
         this.sceneManager.addModel(model);
-        if (isURDF) this.urdfComparison.attachStagedReference();
         this.inertiaReportPanel?.setModel(isMesh ? null : model);
         this.endMoveControls?.setModel(isMesh ? null : model);
 
@@ -956,23 +947,10 @@ class App {
      */
     handleFileClick(fileInfo) {
         const file = this.fileHandler.getFileMap().get(fileInfo.path) || fileInfo.file;
-        const ext = fileInfo.ext;
-        const modelExts = ['urdf', 'xacro', 'xml', 'usd', 'usda', 'usdc', 'usdz'];
-        const meshExts = ['dae', 'stl', 'obj', 'collada'];
-
-        if (modelExts.includes(ext)) {
-            // Robot model file, load model and load into editor
-            this.fileHandler.loadFile(file);
-
-            // If editor is open, auto-load file into editor
-            const editorPanel = document.getElementById('code-editor-panel');
-            if (editorPanel && editorPanel.classList.contains('visible') && this.codeEditorManager) {
-                this.codeEditorManager.loadFile(file);
-            }
-        } else if (meshExts.includes(ext)) {
-            // Mesh file, load as standalone model only, don't load into editor
-            this.fileHandler.loadMeshAsModel(fileInfo.file, fileInfo.name);
-        }
+        const project = this.fileHandler.activeProject;
+        if (project) this.fileHandler.selectProject(project, fileInfo.path);
+        else if (['dae', 'stl', 'obj', 'collada'].includes(fileInfo.ext)) this.fileHandler.loadMeshAsModel(file, file.name);
+        else this.fileHandler.loadFile(file);
     }
 
     /**
@@ -1103,6 +1081,8 @@ class App {
      */
     handleLanguageChanged(lang) {
         i18n.setLanguage(lang);
+        this.fileTreeView?.renderProjects();
+        this.urdfComparison?.refreshProjects();
         this.comparisonPoseControls?.refresh();
         this.animationWorkspace?.refreshLanguage();
         this.inertiaReportPanel?.render();

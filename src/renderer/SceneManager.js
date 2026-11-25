@@ -1,3 +1,4 @@
+import { disposeModelResources } from './disposeModelResources.js';
 import * as THREE from 'three';
 import { canLinkJoints } from './URDFOverlay.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -410,6 +411,7 @@ export class SceneManager {
             this.dragControls = null;
         }
 
+        disposeModelResources(model?.threeObject);
         this.currentModel = null;
     }
 

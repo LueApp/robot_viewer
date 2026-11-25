@@ -25,7 +25,11 @@ export class FileTreeView {
         listContainer.innerHTML = '';
 
         if (files.length === 0) {
-            this.showLoadButton(listContainer);
+            const hint = document.createElement('div');
+            hint.className = 'empty-state';
+            hint.dataset.i18n = 'dropHint';
+            hint.textContent = window.i18n.t('dropHint');
+            listContainer.append(hint);
             return;
         }
 
@@ -37,93 +41,95 @@ export class FileTreeView {
         }
     }
 
-    /**
-     * Show load file/folder button when no files are loaded
-     */
-    showLoadButton(container) {
-        const emptyContainer = document.createElement('div');
-        emptyContainer.className = 'file-tree-empty-container';
-        emptyContainer.style.cssText = `
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            min-height: 200px;
-            padding: 20px;
-            gap: 12px;
-        `;
+    setupProjects(handler) {
+        this.fileHandler = handler;
+        this.library = document.getElementById('project-library');
+        const tabs = [...document.querySelectorAll('#floating-files-panel [role="tab"]')];
+        const activate = tab => {
+            for (const other of tabs) {
+                const selected = other === tab;
+                other.setAttribute('aria-selected', String(selected));
+                other.tabIndex = selected ? 0 : -1;
+                document.getElementById(other.getAttribute('aria-controls')).hidden = !selected;
+            }
+        };
+        for (const tab of tabs) {
+            tab.onclick = () => activate(tab);
+            tab.onkeydown = event => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const next = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs.at(-1) : tabs.find(other => other !== tab);
+                activate(next);
+                next.focus();
+            };
+        }
+        this.library.hidden = false;
+        this.library.querySelector('[data-add-folder]').onclick = () => this.triggerFileLoad(true);
+        this.library.querySelector('[data-add-files]').onclick = () => this.triggerFileLoad();
+        this.modelSelect = this.library.querySelector('[data-project-model]');
+        this.modelSelect.onchange = () => handler.selectProject(handler.selectedProject, this.modelSelect.value);
+        this.renderProjects();
+    }
 
-        const emptyText = document.createElement('div');
-        emptyText.className = 'empty-state';
-        emptyText.style.cssText = 'margin: 0; padding: 0; text-align: center; line-height: 1.6;';
-
-        // First line: drag and drop hint
-        const line1 = document.createElement('div');
-        line1.textContent = window.i18n?.t('dropHint') || 'Drag and drop robot model files or folders anywhere';
-        line1.setAttribute('data-i18n', 'dropHint');
-
-        // Second line: or click button
-        const line2 = document.createElement('div');
-        line2.textContent = window.i18n?.t('orClickButton') || 'or click button to load';
-        line2.setAttribute('data-i18n', 'orClickButton');
-        line2.style.marginTop = '4px';
-
-        emptyText.appendChild(line1);
-        emptyText.appendChild(line2);
-
-        // Create button container for two buttons
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = `
-            display: flex;
-            gap: 8px;
-            margin-top: 8px;
-        `;
-
-        // Load Files Button
-        const loadFilesButton = document.createElement('button');
-        loadFilesButton.className = 'control-button load-files-btn';
-        const loadFilesSpan = document.createElement('span');
-        loadFilesSpan.textContent = window.i18n?.t('loadFiles') || 'Load Files';
-        loadFilesSpan.setAttribute('data-i18n', 'loadFiles');
-        loadFilesButton.appendChild(loadFilesSpan);
-        loadFilesButton.style.cssText = `
-            padding: 8px 16px;
-            font-size: 13px;
-            flex: 1;
-        `;
-        loadFilesButton.title = '选择单个或多个文件';
-        loadFilesButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.triggerFileLoad(false);
-        });
-
-        // Load Folder Button
-        const loadFolderButton = document.createElement('button');
-        loadFolderButton.className = 'control-button load-folder-btn';
-        const loadFolderSpan = document.createElement('span');
-        loadFolderSpan.textContent = window.i18n?.t('loadFolder') || 'Load Folder';
-        loadFolderSpan.setAttribute('data-i18n', 'loadFolder');
-        loadFolderButton.appendChild(loadFolderSpan);
-        loadFolderButton.style.cssText = `
-            padding: 8px 16px;
-            font-size: 13px;
-            flex: 1;
-        `;
-        loadFolderButton.title = '选择整个文件夹';
-        loadFolderButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.triggerFileLoad(true);
-        });
-
-        buttonContainer.appendChild(loadFilesButton);
-        buttonContainer.appendChild(loadFolderButton);
-
-        emptyContainer.appendChild(emptyText);
-        emptyContainer.appendChild(buttonContainer);
-        container.appendChild(emptyContainer);
+    renderProjects() {
+        const handler = this.fileHandler;
+        const list = this.library.querySelector('[data-project-list]');
+        const focused = list.contains(document.activeElement) ? document.activeElement : null;
+        const focusKey = focused?.hasAttribute('data-remove-project') ? 'removeProject' : 'projectId';
+        const focusedId = focused?.dataset[focusKey];
+        const oldIndex = focused ? [...list.children].indexOf(focused.parentElement) : -1;
+        this.library.querySelector('[data-project-empty]').hidden = handler.projects.size > 0;
+        list.replaceChildren();
+        for (const project of handler.projects.values()) {
+            const row = document.createElement('div');
+            row.className = 'project-row';
+            const select = document.createElement('button');
+            select.type = 'button';
+            select.dataset.projectId = project.id;
+            select.title = project.name;
+            const icon = document.createElement('i');
+            icon.className = 'library-folder-icon';
+            icon.setAttribute('aria-hidden', 'true');
+            const name = document.createElement('span');
+            name.className = 'project-name';
+            name.textContent = project.name;
+            select.append(icon, name);
+            select.setAttribute('aria-pressed', String(project === handler.selectedProject));
+            select.onclick = () => handler.selectProject(project);
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.dataset.removeProject = project.id;
+            remove.textContent = '×';
+            remove.title = window.i18n.t('removeProject') + ' · ' + project.name;
+            remove.setAttribute('aria-label', remove.title);
+            remove.onclick = () => handler.removeProject(project);
+            row.append(select, remove);
+            list.append(row);
+        }
+        if (focused) {
+            const buttons = [...list.querySelectorAll(focusKey === 'removeProject' ? '[data-remove-project]' : '[data-project-id]')];
+            const next = buttons.find(button => button.dataset[focusKey] === focusedId)
+                || buttons[Math.min(oldIndex, buttons.length - 1)] || this.library.querySelector('[data-add-folder]');
+            next.focus({ preventScroll: true });
+        }
+        const selected = handler.selectedProject;
+        this.modelSelect.closest('label').hidden = !selected;
+        this.modelSelect.replaceChildren();
+        if (selected) {
+            // Keep the selector focused on robot descriptions when a project also has meshes.
+            const models = selected.models.filter(model => model.category === 'model' || model.path === selected.lastPath);
+            for (const model of models.length ? models : selected.models) {
+                this.modelSelect.add(new Option(model.path, model.path));
+            }
+            this.modelSelect.value = handler.requestedPath || selected.lastPath || this.modelSelect.options[0]?.value;
+            const path = this.modelSelect.value;
+            const parts = path.split('/').filter(Boolean);
+            this.library.querySelector('[data-model-name]').textContent = parts.pop() || '';
+            if (!selected.loose) parts.shift(); // Folder pickers include the project root in every path.
+            this.library.querySelector('[data-model-dir]').textContent = parts.join('/');
+            this.modelSelect.title = path;
+        }
+        this.library.querySelector('[data-project-status]').textContent = handler.projectStatus;
     }
 
     /**
@@ -141,24 +147,12 @@ export class FileTreeView {
             input.setAttribute('accept', '.urdf,.xacro,.xml,.dae,.stl,.obj,.collada' + (supportsUSD ? ',.usd,.usda,.usdc,.usdz' : ''));
         }
 
-        input.addEventListener('change', (e) => {
-            const files = Array.from(e.target.files);
-            if (files && files.length > 0) {
-                // Create a drag event and dispatch it
-                const dt = new DataTransfer();
-                files.forEach(file => dt.items.add(file));
-
-                const dropEvent = new DragEvent('drop', {
-                    bubbles: true,
-                    cancelable: true,
-                    dataTransfer: dt
-                });
-
-                document.body.dispatchEvent(dropEvent);
-            }
-            // Clean up
-            document.body.removeChild(input);
+        input.addEventListener('change', () => {
+            const files = Array.from(input.files);
+            input.remove();
+            if (files.length) this.fileHandler.importFiles(files);
         });
+        input.addEventListener('cancel', () => input.remove());
 
         // Add to DOM temporarily and trigger click
         document.body.appendChild(input);
@@ -400,6 +394,7 @@ export class FileTreeView {
         files.forEach(fileInfo => {
             const item = this.createTreeItem(fileInfo.name, fileInfo.ext);
             item.dataset.filePath = fileInfo.path;
+            item.classList.toggle('selected', fileInfo.file === this.fileHandler?.currentModelFile);
             item.addEventListener('click', (e) => {
                 e.stopPropagation();
                 document.querySelectorAll('.tree-item.selected').forEach(elem => {

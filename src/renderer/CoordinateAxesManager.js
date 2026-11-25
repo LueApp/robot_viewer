@@ -1,3 +1,4 @@
+import { disposeModelResources } from './disposeModelResources.js';
 import * as THREE from 'three';
 import { isURDFLinkFrameJoint } from '../utils/URDFLinkFrame.js';
 
@@ -608,10 +609,9 @@ export class CoordinateAxesManager {
      * Clear all link axes
      */
     clearAllLinkAxes() {
-        this.linkAxesHelpers.forEach((axes, linkName) => {
-            if (axes.parent) {
-                axes.parent.remove(axes);
-            }
+        this.linkAxesHelpers.forEach(axes => {
+            axes.removeFromParent();
+            disposeModelResources(axes);
         });
         this.linkAxesHelpers.clear();
     }
@@ -620,10 +620,9 @@ export class CoordinateAxesManager {
      * Clear all joint axes
      */
     clearAllJointAxes() {
-        this.jointAxesHelpers.forEach((axisInfo, jointName) => {
-            if (axisInfo.isAttached && axisInfo.parent) {
-                axisInfo.parent.remove(axisInfo.mesh);
-            }
+        this.jointAxesHelpers.forEach(({ mesh }) => {
+            mesh.removeFromParent();
+            disposeModelResources(mesh);
         });
         this.jointAxesHelpers.clear();
     }

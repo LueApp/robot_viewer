@@ -65,26 +65,33 @@ Output will be in the `dist/` directory, including the standalone HTML at
 offline HTML** button downloads this file. Each production build regenerates it
 from the same sources as the website.
 
+### Open and switch projects
+
+Use **Files → Add folder** for each local robot folder, or drop several folders
+into the viewer together. Each folder is a separate project with its own meshes
+and textures. Identically named folders get numbered labels. The first project
+opens automatically. Adding another folder keeps the displayed robot in view.
+
+Use the **Projects** tab to switch robots and **File tree** to browse the active
+folder. Use **Model** to choose a description
+when a project contains several. Switching back reopens its last selected model.
+Use **×** beside any project to remove it from this browser session and release
+its resources. Removing the displayed project opens another available project.
+Files on disk are unaffected.
+
 ### Compare two URDF versions
 
-Drop two `.urdf` files together, or select both with **Files → Load Files**.
+With a URDF open, expand **Files → Compare URDFs** and pick a **Reference**.
+The selector groups the imported URDFs by project. You can compare two folders
+or two files in one project. Selecting **No reference** returns to single-robot
+viewing. Dropping two loose URDFs together still opens them as a pair.
+
 Both robots share a root frame and camera. In **Wipe**, drag the divider to
-reveal the primary on the left and the reference on the right, each in its own
-materials. Drag a movable link on either side to pose that robot. Choose **Overlay** and adjust **Opacity** to see the shaded reference
-over the primary.
-
-Open **Joints → Compare poses** to move either robot. Each column has a slider
-and numeric input per movable joint. Turn on **Link matching joints** to align
-the reference to the primary and move compatible same-named joints together
-from either column. Each robot keeps its own joint limits. **Primary tools**
-opens the existing single-robot controls.
-
-For models in separate locations, open **Files → Compare URDFs** and use
-**Choose primary folder** and **Choose reference folder** in either order.
-Include each robot’s meshes in its folder. If a folder contains several URDFs,
-select the one to display. You can replace either folder while keeping the other
-robot. If both versions are in one folder, choose the second URDF in
-**Reference URDF**. Toggle **Show reference** to inspect the primary alone, or select **No reference** to end the comparison.
+reveal each version in its original materials. Drag a movable link on either side
+to pose that robot. Choose **Overlay** and adjust **Opacity** to see the shaded
+reference over the primary. **Joints → Compare poses** provides independent
+sliders and numeric inputs. Enable **Link matching joints** to move compatible
+same-named joints together within each robot’s limits.
 
 ### Single-file offline HTML
 

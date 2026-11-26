@@ -1,0 +1,54 @@
+.mcap-mapping {
+    box-sizing: border-box; width: min(680px, calc(100vw - 24px)); max-height: min(84dvh, 780px);
+    margin: auto; padding: 0; overflow: hidden;
+    background: var(--motion-bg); border: 1px solid var(--motion-line); border-radius: 15px;
+    box-shadow: 0 24px 80px #0006; font-size: 13px; line-height: 1.45;
+}
+.mcap-mapping[open] { display: flex; flex-direction: column; }
+.mcap-mapping::backdrop { background: rgb(9 14 22 / 58%); }
+.mcap-mapping header { padding: 20px 24px 14px; }
+.mcap-mapping h2 { font-size: 21px; font-weight: 650; letter-spacing: -.025em; }
+.mcap-context { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 2px 9px; color: var(--motion-muted); font-size: 12px; }
+.mcap-context span, .mcap-topic, .mcap-mapping small, .mcap-mapping h4 { overflow-wrap: anywhere; }
+.mcap-context [data-model-name]::before { content: '→'; margin-right: 8px; }
+.mcap-steps { list-style: none; display: flex; padding: 0 24px; gap: 20px; border-bottom: 1px solid var(--motion-line); }
+.mcap-steps li { padding: 5px 0 8px; border-bottom: 2px solid transparent; color: var(--motion-muted); font-weight: 550; }
+.mcap-steps li[aria-current=step] { color: var(--motion-accent); border-bottom-color: currentColor; }
+.mcap-steps li:focus { outline: none; }
+.mcap-body { padding: 18px 24px 22px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; min-height: 0; }
+.mcap-body h3 { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.mcap-body [data-help], .mcap-body small { color: var(--motion-muted); }
+.mcap-body [data-help] { margin: 3px 0 14px; }
+.mcap-body section { border: 1px solid var(--motion-line); border-radius: 8px; padding: 11px 13px; margin-top: 8px; background: var(--motion-surface); }
+.mcap-body section:has(.mcap-topic input:checked) { background: var(--motion-selected); border-color: var(--motion-accent); }
+.mcap-topic { display: flex; align-items: center; gap: 9px; font: 600 13px/1.45 ui-monospace, monospace; cursor: pointer; }
+.mcap-topic input { flex: none; width: 15px; height: 15px; }
+.mcap-body section > small { margin-left: 24px; display: block; font-size: 11px; }
+.mcap-body section > p { margin-left: 24px; color: var(--motion-warn); }
+.mcap-body details { margin-top: 9px; padding-top: 7px; border-top: 1px solid var(--motion-line); }
+.mcap-body summary { color: var(--motion-muted); font-size: 12px; cursor: pointer; }
+.mcap-body summary span { margin-left: 8px; font-family: ui-monospace, monospace; color: var(--text-primary); }
+.mcap-topic-fields { display: grid; grid-template-columns: 1fr 1fr 0.95fr; gap: 9px; padding-top: 9px; }
+.mcap-topic-fields label :is(select, input) { width: 100%; }
+.mcap-review { display: flex; gap: 8px 16px; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 8px 0; }
+.mcap-review strong { font-size: 13px; font-variant-numeric: tabular-nums; }
+.mcap-review label { display: inline-flex; gap: 6px; align-items: center; color: var(--motion-muted); }
+.mcap-body section.mcap-joint-group { padding: 0; overflow: hidden; }
+.mcap-joint-group h4 { font: 600 13px/1.4 ui-monospace, monospace; padding: 10px 14px; }
+.mcap-joint, .mcap-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 15px; padding: 6px 14px; align-items: center; }
+.mcap-columns { font-size: 11px; color: var(--motion-muted); border-block: 1px solid var(--motion-line); background: var(--motion-bg); }
+.mcap-joint { font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
+.mcap-joint + .mcap-joint { border-top: 1px solid color-mix(in srgb, var(--motion-line) 52%, transparent); }
+.mcap-joint select { width: 100%; }
+.mcap-joint select[aria-invalid=true] { border-color: var(--motion-warn); }
+.mcap-mapping footer { flex: none; display: flex; align-items: center; gap: 8px; padding: 12px 24px; border-top: 1px solid var(--motion-line); }
+.mcap-mapping [data-cancel] { margin-right: auto; background: transparent; }
+.mcap-mapping .mcap-feedback:not(:empty) { padding: 8px 24px; color: var(--motion-warn); max-height: 15vh; overflow: auto; }
+.mcap-mapping [data-filter-empty] { color: var(--motion-muted); padding-block: 8px; }
+@media (max-width: 540px) {
+    .mcap-mapping { max-height: calc(100dvh - 20px); }
+    .mcap-mapping header, .mcap-body, .mcap-mapping footer, .mcap-mapping .mcap-feedback:not(:empty) { padding-inline: 14px; }
+    .mcap-steps { padding-inline: 14px; }
+    .mcap-topic-fields { grid-template-columns: 1fr; }
+    .mcap-joint, .mcap-columns { grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr); padding-inline: 8px; gap: 8px; }
+}

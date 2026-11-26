@@ -23,13 +23,11 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     const panel = window.app?.liveStatePanel;
     if (panel) {
-        panel.disconnect();
-        panel.connect = () => panel.setStatus('Disabled in offline test');
-        panel.setStatus('Disabled in offline test');
+        panel.liveAvailable = false;
+        panel.get('offline').hidden = false;
         for (const name of ['endpoint', 'connect', 'disconnect', 'record']) {
             panel.get(name).disabled = true;
             panel.get(name).title = 'Live connections are disabled in the offline test version';
         }
-        panel.get('diagnostics').textContent = 'Offline test: live connections are disabled. Saved recordings can still be imported and replayed.';
     }
 });

@@ -193,6 +193,7 @@ class App {
             });
             window.animationWorkspace = this.animationWorkspace;
             this.liveStatePanel = new LiveStatePanel(this);
+            this.fileHandler.onMcapRecording = file => this.liveStatePanel.openMcap(file);
 
             // Set measurement update callback
             this.sceneManager.onMeasurementUpdate = () => {

@@ -235,7 +235,7 @@ Try [`joint-zero-demo.urdf`](public/examples/joint-zero-demo.urdf) for a self-co
 
 ## Live simulator display
 
-The **Live simulation** panel connects to a protocol-independent state stream,
+**Motion player → Live capture** connects to a protocol-independent state stream,
 such as the sibling Behavior Sim runtime at `ws://localhost:8766/state`.
 Load [`behavior-sim.urdf`](public/examples/behavior-sim.urdf) to use its two-motor
 example. The stream carries named joint positions in radians/meters, simulation
@@ -254,20 +254,45 @@ stop the simulator. It records the visualization snapshots it receives, not ever
 controller cycle. Robot model assets remain loaded through the existing file UI.
 See `behavior-sim/spec/common-api.md` for the stream and coordinate conventions.
 
+### Replay an MCAP on a URDF
+
+1. Load the URDF, then drop a local `.mcap` file into the viewer or choose
+   **Motion player → Playback → Open recording**. You can also select the URDF and MCAP
+   together with **Load Files**.
+2. In **Topic data**, select the topics to replay. Standard joint states use
+   `name` and `position`. Expand **Field mapping** to edit the topic rules. For custom data, enter paths such as
+   `feedback.labels` and `feedback.angles`. Leave the names field empty for
+   an indexed array or a scalar. Set the recorded units for each topic.
+3. Choose **Map joints**. Matching names are preselected. Assign each remaining
+   source to a movable model joint, or leave it on **Ignore**. Use **Unmapped only**
+   to review the remaining names. Names belong to their topic, so left and right
+   arm topics can each have a `joint1`.
+4. Choose **Import recording**, then **Play segment**. **Edit mapping**
+   reopens the rules. The browser remembers the last imported rules for the
+   model and matching topics. **More actions → Create animation clip** makes the motion editable.
+
+The importer reads JSON, ROS 1 and ROS 2 `sensor_msgs/JointState`, and custom
+ROS 2 CDR messages with an embedded `ros2msg` definition. It accepts unchunked,
+uncompressed, Zstandard and LZ4 recordings. Unsupported topics are identified in
+the dialog. Replay uses MCAP log timestamps, combines simultaneous updates,
+and holds each joint's last recorded position between updates. Each import
+supports up to 100,000 selected messages containing joint positions. Playback
+runs locally, including in the standalone offline HTML.
+
 ### Create an animation clip from recorded motion
 
-1. Load the matching robot model and connect **Live simulation**.
+1. Load the matching robot model, open **Motion player → Live capture**, and click **Connect**.
 2. Click **Record motion**, let the simulator run for a few seconds, then click
-   **Stop recording**. The nearby indicator shows captured snapshot/segment counts.
-3. Select the recorded segment. Alternatively, open a previously exported
+   **Stop recording**. The panel opens the captured motion in **Playback**.
+3. If the recording contains multiple segments, select one. Alternatively, open a previously exported
    `.robotlive.json` file and select a segment from it.
-4. Click **Create animation clip**. This creates an editable copy named
+4. Open **More actions → Create animation clip**. This creates an editable copy named
    **Recorded simulation**, selects it, opens the **Animation Editor**, and moves
    its playhead to the beginning. The live viewer connection is disconnected.
 5. Press **▶ Play** in the Animation Editor or edit the timeline keyframes.
 
 This operation creates a clip from an existing recording; it does not start
-recording or download a file. Use **Export recording** to save the original
+recording or download a file. Use **More actions → Export recording** to save the original
 capture, or the Animation Editor's project export to save editable clips. The
 original capture is retained in memory. Empty, zero-duration or unmapped captures
 produce an actionable message instead of an empty clip.

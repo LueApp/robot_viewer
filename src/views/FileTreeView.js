@@ -144,7 +144,7 @@ export class FileTreeView {
         input.style.display = 'none';
 
         if (!isFolder) {
-            input.setAttribute('accept', '.urdf,.xacro,.xml,.dae,.stl,.obj,.collada' + (supportsUSD ? ',.usd,.usda,.usdc,.usdz' : ''));
+            input.setAttribute('accept', '.urdf,.xacro,.xml,.dae,.stl,.obj,.collada,.mcap' + (supportsUSD ? ',.usd,.usda,.usdc,.usdz' : ''));
         }
 
         input.addEventListener('change', () => {

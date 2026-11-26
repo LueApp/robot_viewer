@@ -1,10 +1,110 @@
-.live-state-panel { position:fixed; right:18px; bottom:18px; z-index:1000; width:340px; max-height:80vh; overflow:auto; border:1px solid #51616c; border-radius:8px; background:#17232eef; color:#e5edf3; font:12px system-ui; box-shadow:0 6px 20px #0006; }
-.live-state-panel summary { padding:12px; cursor:pointer; font-weight:600; }
-.live-state-panel [data-status] { display:block; font-size:11px; color:#9bdccb; font-weight:400; margin-top:3px; }
-.live-state-content { padding:0 12px 12px; }
-.live-state-panel label { display:block; margin:8px 0; }
-.live-state-panel input:not([type=checkbox]), .live-state-panel select, .live-state-panel textarea { display:block; box-sizing:border-box; width:100%; margin-top:4px; }
-.live-state-panel input, .live-state-panel select, .live-state-panel textarea, .live-state-panel button { color:inherit; background:#253948; border:1px solid #516878; border-radius:4px; padding:5px; font:inherit; }
-.live-state-panel button { margin:3px 3px 3px 0; cursor:pointer; }
-.live-state-panel pre { max-height:160px; overflow:auto; white-space:pre-wrap; }
-.live-state-panel [data-diagnostics] { white-space:pre-wrap; color:#ffd096; }
+.live-state-panel, .mcap-mapping {
+    --motion-bg: #1e242c;
+    --motion-surface: #272f39;
+    --motion-field: #171d24;
+    --motion-line: #424c59;
+    --motion-muted: #bac4d1;
+    --motion-accent: #a4caff;
+    --motion-on-accent: #102944;
+    --motion-selected: #25394e;
+    --motion-warn: #f5bc85;
+    color: var(--text-primary);
+    color-scheme: dark;
+    font-family: inherit;
+}
+[data-theme="light"] :is(.live-state-panel, .mcap-mapping) {
+    --motion-bg: #fafbfd;
+    --motion-surface: #f1f4f8;
+    --motion-field: #fff;
+    --motion-line: #ced6df;
+    --motion-muted: #536477;
+    --motion-accent: #205f9f;
+    --motion-on-accent: #fff;
+    --motion-selected: #eaf2fd;
+    --motion-warn: #974a17;
+    color-scheme: light;
+}
+:is(.live-state-panel, .mcap-mapping) [hidden] { display: none !important; }
+:is(.live-state-panel, .mcap-mapping) :is(button, select, input, textarea, summary):focus-visible {
+    outline: 2px solid var(--motion-accent); outline-offset: 2px;
+}
+:is(.live-state-panel, .mcap-mapping) :where(button, input:not([type=checkbox]), select, textarea) {
+    min-width: 0; min-height: 32px; padding: 5px 9px; border: 1px solid var(--motion-line);
+    border-radius: 6px; background: var(--motion-field); color: inherit; font: inherit;
+}
+:is(.live-state-panel, .mcap-mapping) button { cursor: pointer; font-weight: 550; background: var(--motion-surface); }
+:is(.live-state-panel, .mcap-mapping) button:hover:enabled { border-color: var(--motion-accent); }
+:is(.live-state-panel, .mcap-mapping) button:disabled { opacity: .48; cursor: default; }
+:is(.live-state-panel, .mcap-mapping) .motion-primary {
+    background: var(--motion-accent); color: var(--motion-on-accent); border-color: transparent;
+}
+:is(.live-state-panel, .mcap-mapping) input[type=checkbox] { accent-color: var(--motion-accent); }
+.live-state-panel {
+    position: fixed; right: 18px; bottom: 18px; z-index: 210;
+    width: fit-content; max-width: calc(100vw - 24px); overflow: hidden;
+    border: 1px solid var(--motion-line); border-radius: 12px; background: var(--motion-bg);
+    font-size: 13px; line-height: 1.45; box-shadow: 0 8px 32px #0004;
+}
+.live-state-panel[open] { width: 324px; }
+.live-state-panel .motion-heading {
+    list-style: none; display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    cursor: pointer; user-select: none;
+}
+.live-state-panel summary::-webkit-details-marker { display: none; }
+.motion-heading strong { white-space: nowrap; font-size: 14px; font-weight: 650; }
+.motion-heading [data-status] { margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--motion-muted); }
+.motion-bars { width: 15px; height: 17px; flex: none; color: var(--motion-accent); background:
+    linear-gradient(currentColor, currentColor) left center / 3px 7px no-repeat,
+    linear-gradient(currentColor, currentColor) center / 3px 17px no-repeat,
+    linear-gradient(currentColor, currentColor) right center / 3px 11px no-repeat; }
+.motion-chevron { width: 7px; height: 7px; flex: none; border: solid var(--motion-muted); border-width: 1.5px 1.5px 0 0; transform: rotate(-45deg); }
+.live-state-panel[open] .motion-chevron { transform: rotate(135deg); }
+.motion-tabs { display: flex; gap: 18px; border-block: 1px solid var(--motion-line); padding-inline: 15px; }
+.motion-tabs [role=tab] { padding: 8px 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--motion-muted); }
+.motion-tabs [aria-selected=true] { color: var(--motion-accent); border-bottom-color: currentColor; }
+.motion-body { padding: 14px; overflow: auto; max-height: min(65vh, calc(100dvh - 115px)); scrollbar-width: thin; }
+.motion-body > [role=tabpanel] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.motion-file strong { font-size: 14px; font-weight: 600; }
+.motion-file small, .motion-time, .motion-note { color: var(--motion-muted); font-size: 12px; }
+.motion-file { display: flex; align-items: center; gap: 10px; }
+.motion-file div { min-width: 0; }
+.motion-file strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.motion-file-icon { flex: none; width: 23px; height: 28px; border: 1.5px solid var(--motion-accent); border-radius: 4px; color: var(--motion-accent); background:
+    linear-gradient(currentColor,currentColor) center 58% / 11px 1px no-repeat,
+    linear-gradient(currentColor,currentColor) center 74% / 11px 1px no-repeat; }
+.motion-body label, .mcap-topic-fields label { display: grid; gap: 4px; color: var(--motion-muted); font-size: 12px; }
+.motion-body label :is(input, textarea, select), .mcap-topic-fields label input, .mcap-topic-fields label select { color: var(--text-primary); }
+.motion-body textarea { resize: vertical; min-height: 54px; }
+.motion-time { display: flex; justify-content: space-between; margin-top: 14px; font-variant-numeric: tabular-nums; font-size: 11px; }
+.motion-body progress { appearance: none; display: block; width: 100%; height: 4px; border: 0; margin: 4px 0 12px; border-radius: 8px; overflow: hidden; background: var(--motion-line); }
+.motion-body progress::-webkit-progress-bar { background: var(--motion-line); }
+.motion-body progress::-webkit-progress-value { background: var(--motion-accent); }
+.motion-body progress::-moz-progress-bar { background: var(--motion-accent); }
+.motion-body [data-segment-label] { margin-top: 10px; }
+.motion-transport, .motion-actions, .motion-files { display: flex; gap: 6px; flex-wrap: wrap; }
+.motion-transport button, .motion-files button { flex: 1; }
+.motion-files > .motion-primary { display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 2px 10px;
+    text-align: left; padding: 12px 14px; background: var(--motion-selected); border-color: var(--motion-line); color: var(--motion-accent); }
+.motion-files > .motion-primary::before { content: '+'; grid-row: span 2; text-align: center; font-size: 24px; font-weight: 400; }
+.motion-files > .motion-primary small { color: var(--motion-muted); font-size: 11px; font-weight: 400; }
+.motion-files { align-items: start; }
+.motion-files details { flex: 1; }
+.motion-files details[open] { flex-basis: 100%; }
+.motion-files summary { padding: 6px 4px; text-align: center; cursor: pointer; color: var(--motion-muted); }
+.motion-files details[open] summary { text-align: left; }
+.motion-body [data-loaded]:not([hidden]) ~ .motion-files { padding-top: 12px; border-top: 1px solid var(--motion-line); }
+.motion-disclosure { border-top: 1px solid var(--motion-line); padding-top: 8px; }
+.motion-disclosure summary { cursor: pointer; list-style: none; color: var(--motion-muted); }
+.motion-disclosure summary::before { display: inline-block; content: '›'; margin-right: 8px; font-weight: bold; }
+.motion-disclosure[open] > summary::before { transform: rotate(90deg); }
+.motion-disclosure :is(label, pre, .motion-actions) { margin-top: 9px; }
+.motion-disclosure .motion-check { display: flex; align-items: center; gap: 7px; }
+.motion-body [data-inspector], .motion-local { margin-top: 12px; }
+.motion-body [data-warning-count]:not(:empty) { color: var(--motion-warn); }
+.motion-body pre, .motion-body [data-diagnostics] { font: 11px/1.5 monospace; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 120px; overflow: auto; }
+.motion-body [data-diagnostics], .motion-error { color: var(--motion-warn); }
+.motion-error:not(:empty), .motion-body [data-animation-result]:not(:empty) { margin-top: 10px; }
+.motion-body p:empty { display: none; }
+@media (max-width: 600px) {
+    .live-state-panel { bottom: max(10px, env(safe-area-inset-bottom)); right: 10px; }
+}

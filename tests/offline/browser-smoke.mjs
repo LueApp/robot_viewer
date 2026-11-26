@@ -9,6 +9,7 @@ import { once } from 'node:events';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startServer } from '../../tools/offline/server.mjs';
 import { checkComparisonFolders } from './comparison-folders.mjs';
+import { checkMcapReplay } from './mcap-replay.mjs';
 
 const archive = path.resolve(process.argv[2]);
 const standalone = archive.endsWith('.html');
@@ -162,6 +163,7 @@ try {
     };
     await load('joint-zero-demo.urdf');
     assert.equal(await evaluate('app.currentModel.joints.has("motor_joint")'), true);
+    await checkMcapReplay({ call, evaluate, until, temporary });
     await evaluate('app.poseController.setJointValue("motor_joint", 0.5)');
     assert.equal(await evaluate('app.currentModel.joints.get("motor_joint").currentValue'), 0.5);
     console.log('PASS: URDF loads and joint movement works');

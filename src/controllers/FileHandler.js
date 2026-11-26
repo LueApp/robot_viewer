@@ -112,8 +112,7 @@ export class FileHandler {
                 loose.push(droppedFiles[i]);
             }
         }
-        if (loose.length) groups.push(this.looseProject(loose));
-        return this.importProjects(groups);
+        return this.importWithRecordings(groups, loose);
     }
 
     looseProject(files) {
@@ -138,10 +137,21 @@ export class FileHandler {
             if (!folders.has(name)) folders.set(name, { name, assets: new Map() });
             folders.get(name).assets.set(file.webkitRelativePath, file);
         }
-        const groups = [...folders.values()];
-        if (loose.length) groups.push(this.looseProject(loose));
-        const pair = !folders.size && loose.length === 2 && loose.every(file => /\.urdf$/i.test(file.name));
-        return this.importProjects(groups, { open: !folders.size, primaryFile: pair ? loose[0] : null, referenceFile: pair ? loose[1] : null });
+        return this.importWithRecordings([...folders.values()], loose);
+    }
+
+    async importWithRecordings(groups, loose) {
+        const recordings = loose.filter(file => /\.mcap$/i.test(file.name));
+        const assets = loose.filter(file => !/\.mcap$/i.test(file.name));
+        const open = groups.length === 0;
+        const pair = open && assets.length === 2 && assets.every(file => /\.urdf$/i.test(file.name));
+        if (assets.length) groups.push(this.looseProject(assets));
+        if (groups.length) await this.importProjects(groups, { open, primaryFile: pair ? assets[0] : null, referenceFile: pair ? assets[1] : null });
+        if (recordings.length === 1) await this.onMcapRecording?.(recordings[0]);
+        if (recordings.length > 1) {
+            this.projectStatus = 'Open one MCAP recording at a time.';
+            this.onProjectsChanged?.();
+        }
     }
 
     async importProjects(groups, { open = false, primaryFile, referenceFile } = {}) {
